@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('passwordSubmit').addEventListener('click', checkPassword);
     
     initializeAssistant();
-    // initUniversalVoiceBtn(); <-- આ લાઈન કાઢી નાખી છે (એટલે Extra Mic જતું રહેશે)
 });
 
 function checkPassword() {
@@ -70,10 +69,9 @@ function showPage(pageId) {
 }
 
 // ==========================================
-// 2. AI ASSISTANT (INTERNAL MIC RESTORED)
+// 2. AI ASSISTANT (SMART COMMANDS ADDED)
 // ==========================================
 function initializeAssistant() {
-    // Open/Close Logic
     document.body.addEventListener('click', function(e) {
         if (e.target.closest('.assistant-icon')) {
             document.getElementById('aiAssistant').classList.add('active');
@@ -85,62 +83,31 @@ function initializeAssistant() {
         }
     });
 
-    // Create Mic Button INSIDE the input area
     const btn = document.createElement('button');
     btn.innerHTML = '<span class="material-icons">mic</span>';
     btn.style = "border:none; background:none; color:#FF6B6B; cursor:pointer; padding: 0 10px;";
-    
-    // Attach Voice Function to this button
     btn.onclick = toggleChatVoice; 
-    
     const inputArea = document.querySelector('.assistant-input');
-    if(inputArea) inputArea.prepend(btn); // Add button before text box
+    if(inputArea) inputArea.prepend(btn);
 }
 
 function toggleChatVoice() {
-    // Check Browser Support
     if (!('webkitSpeechRecognition' in window)) {
-        alert("તમારા બ્રાઉઝરમાં માઈક સપોર્ટ નથી. કૃપા કરીને Google Chrome વાપરો.");
-        return;
+        alert("તમારા બ્રાઉઝરમાં માઈક સપોર્ટ નથી."); return;
     }
-
     const SpeechRecognition = window.webkitSpeechRecognition;
     const r = new SpeechRecognition();
-    r.lang = 'gu-IN'; // Gujarati Language
-    r.continuous = false;
-    r.interimResults = false;
-
-    r.onstart = () => { 
-        document.getElementById('assistantInput').placeholder = "બોલો..."; 
-        // Small vibration or visual cue
-        const micIcon = document.querySelector('.assistant-input button span');
-        if(micIcon) micIcon.style.color = "green";
-    };
+    r.lang = 'gu-IN';
+    r.continuous = false; 
     
-    r.onend = () => {
-        document.getElementById('assistantInput').placeholder = "લખો...";
-        const micIcon = document.querySelector('.assistant-input button span');
-        if(micIcon) micIcon.style.color = "#FF6B6B";
-    };
-
+    r.onstart = () => { document.getElementById('assistantInput').placeholder = "સાંભળી રહ્યો છું..."; };
+    r.onend = () => { document.getElementById('assistantInput').placeholder = "લખો..."; };
     r.onresult = (e) => {
         const text = e.results[0][0].transcript;
         document.getElementById('assistantInput').value = text;
-        sendMessage(); // Auto send after speaking
+        sendMessage();
     };
-
-    r.onerror = (e) => {
-        if(e.error === 'not-allowed') {
-            alert("માઈક પરમિશન બંધ છે. સેટિંગમાં જઈને Allow કરો.");
-        }
-    };
-
-    try {
-        r.start();
-    } catch(err) {
-        // Microphone might be already active
-        console.log(err);
-    }
+    try { r.start(); } catch(err) { console.log(err); }
 }
 
 function handleAssistantKeypress(e) { if(e.key==='Enter') sendMessage(); }
@@ -164,59 +131,104 @@ function speak(text) {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'gu-IN';
-        u.rate = 0.9;
         window.speechSynthesis.speak(u);
     }
 }
 
+// === THE BRAIN (Navigation + Print + Calculation) ===
 function processSmartQuery(query) {
     const q = query.toLowerCase();
-    let resp = "સમજાય તેવું બોલોને બેન....";
-    const m = appState.currentMonth;
-    const y = appState.currentYear;
-    const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
-    const stockData = JSON.parse(localStorage.getItem(`stock_${y}_${m}`)) || {};
-    
-    let item = null; let unit = "કિલો"; let itemName="";
-    if (q.includes('ઘઉં')) { item='wheat'; itemName='ઘઉં'; }
-    else if (q.includes('ચોખા')) { item='rice'; itemName='ચોખા'; }
-    else if (q.includes('તેલ')) { item='oil'; itemName='તેલ'; unit="લિટર"; }
-    else if (q.includes('ચણા')) { item='chana'; itemName='ચણા'; }
-    else if (q.includes('દાળ')) { item='dal'; itemName='દાળ'; }
+    let resp = "સમજાય તેવું બોલોને બેન...";
+    let actionTaken = false;
 
-    if (item && (q.includes('વપરાશ') || q.includes('કેટલું'))) {
-        let totalVal = 0;
-        const days = new Date(y, m+1, 0).getDate();
-        let isMorning = q.includes('સવાર');
-        let isAfternoon = q.includes('બપોર');
-        for(let d=1; d<=days; d++) {
-            const date = new Date(y, m, d);
-            const day = date.getDay();
-            const count = benData[d] || 0;
-            if(day===0 || count===0) continue;
-            let mUse=0, aUse=0;
-            if(item==='wheat') { if([1,3,4,5,6].includes(day)) mUse=0.030*count; if([1,2,5].includes(day)) aUse=0.050*count; }
-            if(item==='rice') { if(day===2) mUse=0.030*count; if([3,4,6].includes(day)) aUse=0.050*count; }
-            if(item==='oil') { if([1,2,3,4,5,6].includes(day)) { mUse=0.005*count; aUse=0.008*count; } }
-            if(item==='chana' && [2,4,5].includes(day)) aUse=0.020*count;
-            if(item==='dal' && [1,3].includes(day)) aUse=0.020*count;
-            
-            if (isMorning) totalVal += mUse;
-            else if (isAfternoon) totalVal += aUse;
-            else totalVal += (mUse + aUse);
-        }
-        resp = `આ મહિનામાં ${itemName}ની ${isMorning?"સવારની":(isAfternoon?"બપોરની":"કુલ")} વપરાશ ${totalVal.toFixed(3)} ${unit} છે.`;
+    // --- 1. NAVIGATION COMMANDS ---
+    if (q.includes('રિપોર્ટ') && (q.includes('ખોલો') || q.includes('પેજ') || q.includes('જાઓ'))) {
+        showPage('reportPage');
+        resp = "રિપોર્ટ પેજ ખોલ્યું.";
+        actionTaken = true;
     } 
-    else if (q.includes('લાભાર્થી')) {
-        let t = 0; for(let k in benData) t += benData[k];
-        resp = `કુલ લાભાર્થી: ${t}`;
+    else if (q.includes('બિલ') && (q.includes('ખોલો') || q.includes('પેજ'))) {
+        showPage('billPage');
+        resp = "બિલ પેજ ખોલ્યું.";
+        actionTaken = true;
     }
-    else if (q.includes('સ્ટોક')) {
-        if(item) {
-             let o = parseFloat(stockData[`${item}_open`])||0;
-             let i = parseFloat(stockData[`${item}_income`])||0;
-             resp = `${itemName}: ઓપનિંગ ${o}, આવક ${i}`;
-        } else resp = "કોનો સ્ટોક?";
+    else if (q.includes('સ્ટોક') && (q.includes('ખોલો') || q.includes('પેજ'))) {
+        showPage('stockPage');
+        resp = "સ્ટોક પેજ ખોલ્યું.";
+        actionTaken = true;
+    }
+    else if (q.includes('લાભાર્થી') && (q.includes('ખોલો') || q.includes('પેજ'))) {
+        showPage('beneficiaryPage');
+        resp = "લાભાર્થી પેજ ખોલ્યું.";
+        actionTaken = true;
+    }
+    else if (q.includes('હોમ') || q.includes('ઘરે')) {
+        showPage('homePage');
+        resp = "હોમ પેજ ખોલ્યું.";
+        actionTaken = true;
+    }
+
+    // --- 2. PRINT COMMAND ---
+    else if (q.includes('પ્રિન્ટ') || q.includes('print')) {
+        if(document.getElementById('reportPage').classList.contains('active')) {
+            openPreview();
+            setTimeout(printPreview, 500); // Wait for modal
+            resp = "રિપોર્ટ પ્રિન્ટ કરી રહ્યો છું...";
+        } else {
+            window.print();
+            resp = "પ્રિન્ટ કમાન્ડ આપ્યો.";
+        }
+        actionTaken = true;
+    }
+
+    // --- 3. CALCULATION LOGIC (If no command executed) ---
+    if (!actionTaken) {
+        const m = appState.currentMonth;
+        const y = appState.currentYear;
+        const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
+        const stockData = JSON.parse(localStorage.getItem(`stock_${y}_${m}`)) || {};
+        
+        let item = null; let unit = "કિલો"; let itemName="";
+        if (q.includes('ઘઉં')) { item='wheat'; itemName='ઘઉં'; }
+        else if (q.includes('ચોખા')) { item='rice'; itemName='ચોખા'; }
+        else if (q.includes('તેલ')) { item='oil'; itemName='તેલ'; unit="લિટર"; }
+        else if (q.includes('ચણા')) { item='chana'; itemName='ચણા'; }
+        else if (q.includes('દાળ')) { item='dal'; itemName='દાળ'; }
+
+        if (item && (q.includes('વપરાશ') || q.includes('કેટલું'))) {
+            let totalVal = 0;
+            const days = new Date(y, m+1, 0).getDate();
+            let isMorning = q.includes('સવાર');
+            let isAfternoon = q.includes('બપોર');
+            for(let d=1; d<=days; d++) {
+                const date = new Date(y, m, d);
+                const day = date.getDay();
+                const count = benData[d] || 0;
+                if(day===0 || count===0) continue;
+                let mUse=0, aUse=0;
+                if(item==='wheat') { if([1,3,4,5,6].includes(day)) mUse=0.030*count; if([1,2,5].includes(day)) aUse=0.050*count; }
+                if(item==='rice') { if(day===2) mUse=0.030*count; if([3,4,6].includes(day)) aUse=0.050*count; }
+                if(item==='oil') { if([1,2,3,4,5,6].includes(day)) { mUse=0.005*count; aUse=0.008*count; } }
+                if(item==='chana' && [2,4,5].includes(day)) aUse=0.020*count;
+                if(item==='dal' && [1,3].includes(day)) aUse=0.020*count;
+                
+                if (isMorning) totalVal += mUse;
+                else if (isAfternoon) totalVal += aUse;
+                else totalVal += (mUse + aUse);
+            }
+            resp = `આ મહિનામાં ${itemName}ની ${isMorning?"સવારની":(isAfternoon?"બપોરની":"કુલ")} વપરાશ ${totalVal.toFixed(3)} ${unit} છે.`;
+        } 
+        else if (q.includes('લાભાર્થી')) {
+            let t = 0; for(let k in benData) t += benData[k];
+            resp = `કુલ લાભાર્થી: ${t}`;
+        }
+        else if (q.includes('સ્ટોક')) {
+            if(item) {
+                 let o = parseFloat(stockData[`${item}_open`])||0;
+                 let i = parseFloat(stockData[`${item}_income`])||0;
+                 resp = `${itemName}: ઓપનિંગ ${o}, આવક ${i}`;
+            } else resp = "કોનો સ્ટોક?";
+        }
     }
     
     addMessage(resp, 'assistant');
@@ -535,10 +547,9 @@ function loadCenterInfo() {
     if(info) {
         appState.centerInfo = info;
         if(document.getElementById('centerNameHome')) document.getElementById('centerNameHome').value = info.centerName;
-        if(document.getElementById('centerName')) document.getElementById('centerName').value = info.centerName;
-        ['workerName','sejo','centerCode'].forEach(k => {
-            if(document.getElementById(k+'Home')) document.getElementById(k+'Home').value = info[k];
-        });
+        if(document.getElementById('workerNameHome')) document.getElementById('workerNameHome').value = info.workerName;
+        if(document.getElementById('sejoHome')) document.getElementById('sejoHome').value = info.sejo;
+        if(document.getElementById('centerCodeHome')) document.getElementById('centerCodeHome').value = info.centerCode;
     }
 }
 function saveCenterInfo() {
