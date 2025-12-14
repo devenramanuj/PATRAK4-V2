@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('passwordSubmit').addEventListener('click', checkPassword);
     
     initializeAssistant();
-    initUniversalVoiceBtn();
+    // initUniversalVoiceBtn(); <-- આ લાઈન કાઢી નાખી છે (એટલે Extra Mic જતું રહેશે)
 });
 
 function checkPassword() {
@@ -70,13 +70,14 @@ function showPage(pageId) {
 }
 
 // ==========================================
-// 2. AI ASSISTANT
+// 2. AI ASSISTANT (INTERNAL MIC RESTORED)
 // ==========================================
 function initializeAssistant() {
+    // Open/Close Logic
     document.body.addEventListener('click', function(e) {
         if (e.target.closest('.assistant-icon')) {
             document.getElementById('aiAssistant').classList.add('active');
-            speak("જય શ્રી કૃષ્ણ!");
+            speak("નમસ્તે! હું તૈયાર છું.");
         }
         if (e.target.closest('.assistant-close')) {
             document.getElementById('aiAssistant').classList.remove('active');
@@ -84,25 +85,62 @@ function initializeAssistant() {
         }
     });
 
+    // Create Mic Button INSIDE the input area
     const btn = document.createElement('button');
     btn.innerHTML = '<span class="material-icons">mic</span>';
-    btn.style = "border:none; background:none; color:#FF6B6B; cursor:pointer;";
-    btn.onclick = toggleChatVoice;
+    btn.style = "border:none; background:none; color:#FF6B6B; cursor:pointer; padding: 0 10px;";
+    
+    // Attach Voice Function to this button
+    btn.onclick = toggleChatVoice; 
+    
     const inputArea = document.querySelector('.assistant-input');
-    if(inputArea) inputArea.prepend(btn);
+    if(inputArea) inputArea.prepend(btn); // Add button before text box
 }
 
 function toggleChatVoice() {
-    if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const r = new SR(); r.lang='gu-IN';
-        r.onstart = () => document.getElementById('assistantInput').placeholder = "સાંભળી રહ્યો છું...";
-        r.onresult = (e) => {
-            document.getElementById('assistantInput').value = e.results[0][0].transcript;
-            sendMessage();
-        };
+    // Check Browser Support
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("તમારા બ્રાઉઝરમાં માઈક સપોર્ટ નથી. કૃપા કરીને Google Chrome વાપરો.");
+        return;
+    }
+
+    const SpeechRecognition = window.webkitSpeechRecognition;
+    const r = new SpeechRecognition();
+    r.lang = 'gu-IN'; // Gujarati Language
+    r.continuous = false;
+    r.interimResults = false;
+
+    r.onstart = () => { 
+        document.getElementById('assistantInput').placeholder = "બોલો..."; 
+        // Small vibration or visual cue
+        const micIcon = document.querySelector('.assistant-input button span');
+        if(micIcon) micIcon.style.color = "green";
+    };
+    
+    r.onend = () => {
+        document.getElementById('assistantInput').placeholder = "લખો...";
+        const micIcon = document.querySelector('.assistant-input button span');
+        if(micIcon) micIcon.style.color = "#FF6B6B";
+    };
+
+    r.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        document.getElementById('assistantInput').value = text;
+        sendMessage(); // Auto send after speaking
+    };
+
+    r.onerror = (e) => {
+        if(e.error === 'not-allowed') {
+            alert("માઈક પરમિશન બંધ છે. સેટિંગમાં જઈને Allow કરો.");
+        }
+    };
+
+    try {
         r.start();
-    } else showToast("માઈક સપોર્ટ નથી", "error");
+    } catch(err) {
+        // Microphone might be already active
+        console.log(err);
+    }
 }
 
 function handleAssistantKeypress(e) { if(e.key==='Enter') sendMessage(); }
@@ -123,13 +161,17 @@ function addMessage(t, s) {
 
 function speak(text) {
     if ('speechSynthesis' in window) {
-        try { const u = new SpeechSynthesisUtterance(text); u.lang = 'gu-IN'; window.speechSynthesis.speak(u); } catch(e){}
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'gu-IN';
+        u.rate = 0.9;
+        window.speechSynthesis.speak(u);
     }
 }
 
 function processSmartQuery(query) {
     const q = query.toLowerCase();
-    let resp = "સમજાય તેવું બોલો ને બેન...";
+    let resp = "હું સમજ્યો નહીં.";
     const m = appState.currentMonth;
     const y = appState.currentYear;
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
@@ -181,31 +223,7 @@ function processSmartQuery(query) {
     speak(resp);
 }
 
-// ==========================================
-// 3. UNIVERSAL MIC
-// ==========================================
-function initUniversalVoiceBtn() {
-    const btn = document.createElement('div');
-    btn.className = 'voice-float-btn';
-    btn.innerHTML = '<span class="material-icons">mic</span>';
-    document.body.appendChild(btn);
-    let activeInput;
-    document.addEventListener('focusin', e => { if(e.target.tagName==='INPUT') activeInput = e.target; });
-    
-    if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const r = new SR(); r.lang='gu-IN';
-        btn.onclick = () => { if(activeInput){ try{r.start(); btn.classList.add('listening');}catch(e){} } else showToast("ખાના પર ક્લિક કરો","error"); };
-        r.onend = () => btn.classList.remove('listening');
-        r.onresult = e => {
-            let t = e.results[0][0].transcript;
-            if(activeInput.type==='number') t=t.replace(/[૦-૯]/g,d=>"0123456789"["૦૧૨૩૪૫૬૭૮૯".indexOf(d)]).replace(/[^0-9.]/g,'');
-            activeInput.value = t; activeInput.dispatchEvent(new Event('input')); // Auto Save Trigger
-        };
-    } else btn.style.display='none';
-}
-
-// 4. CALENDAR
+// 3. CALENDAR
 function changeMonth(offset) {
     let m = appState.currentMonth + offset;
     let y = appState.currentYear;
@@ -255,7 +273,7 @@ function updateTotalBeneficiaries() {
     if(document.getElementById('totalCount')) document.getElementById('totalCount').innerText = t;
 }
 
-// 5. STOCK
+// 4. STOCK (Auto Save)
 function loadStockData() {
     const m = document.getElementById('stockMonthSelector').value;
     const y = document.getElementById('stockYearSelector').value;
@@ -315,7 +333,7 @@ function saveMatruMandalStockData() {
     localStorage.setItem(`matruMandalStock_${y}_${m}`, JSON.stringify(appState.matruMandalStock));
 }
 
-// 6. REPORT
+// 5. REPORT
 function generateReport(isDaily) {
     const container = document.getElementById('reportTableContainer');
     const m = parseInt(document.getElementById('reportMonthSelector').value);
@@ -430,6 +448,7 @@ function generateReport(isDaily) {
     });
     document.getElementById('reportSummaryTable').innerHTML = sumHtml;
     document.getElementById('reportSummaryContainer').style.display = 'block';
+    
     openPreview();
 }
 
@@ -475,7 +494,7 @@ function downloadPDF() {
 }
 function shareOnWhatsApp() { window.open(`https://wa.me/?text=Report`, '_blank'); }
 
-// 7. BILL
+// 6. BILL
 function calculateMasalaAmounts() {
     const m = document.getElementById('billMonthSelector').value || appState.currentMonth;
     const y = document.getElementById('billYearSelector').value || appState.currentYear;
@@ -509,16 +528,17 @@ function fillCert(s, r) {
 }
 function closeCertificate(id) { document.getElementById(id).style.display = 'none'; }
 
-// 8. UTILS
+// 7. UTILS
 function showToast(m,t) { const x=document.getElementById('toast'); x.textContent=m; x.className=`toast show ${t}`; setTimeout(()=>x.classList.remove('show'),3000); }
 function loadCenterInfo() {
     const info = JSON.parse(localStorage.getItem('centerInfo'));
     if(info) {
         appState.centerInfo = info;
         if(document.getElementById('centerNameHome')) document.getElementById('centerNameHome').value = info.centerName;
-        if(document.getElementById('workerNameHome')) document.getElementById('workerNameHome').value = info.workerName;
-        if(document.getElementById('sejoHome')) document.getElementById('sejoHome').value = info.sejo;
-        if(document.getElementById('centerCodeHome')) document.getElementById('centerCodeHome').value = info.centerCode;
+        if(document.getElementById('centerName')) document.getElementById('centerName').value = info.centerName;
+        ['workerName','sejo','centerCode'].forEach(k => {
+            if(document.getElementById(k+'Home')) document.getElementById(k+'Home').value = info[k];
+        });
     }
 }
 function saveCenterInfo() {
@@ -529,8 +549,6 @@ function saveCenterInfo() {
     localStorage.setItem('centerInfo', JSON.stringify(appState.centerInfo));
     showToast("સેવ થયું","success");
 }
-
-// AGE CALCULATOR (RESTORED)
 function calculateAge() {
     const birthDate = new Date(document.getElementById('birthDate').value);
     const currentDate = new Date(document.getElementById('currentDate').value);
@@ -555,10 +573,7 @@ function calculateAge() {
 
     document.getElementById('ageResult').innerText = `${years} વર્ષ, ${months} મહિના, ${days} દિવસ`;
 }
-
-function calculateBMI(){ 
-    // Logic Placeholder if needed
-}
+function calculateBMI(){ /* Logic */ }
 function appendToDisplay(v) { document.getElementById('calcDisplay').innerText += v; }
 function clearCalculator() { document.getElementById('calcDisplay').innerText = '0'; }
 function deleteLast() { let d=document.getElementById('calcDisplay'); d.innerText=d.innerText.slice(0,-1)||'0'; }
