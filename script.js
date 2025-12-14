@@ -76,7 +76,7 @@ function initializeAssistant() {
     document.body.addEventListener('click', function(e) {
         if (e.target.closest('.assistant-icon')) {
             document.getElementById('aiAssistant').classList.add('active');
-            speak("જય શ્રી કૃષ્ણ!");
+            speak("નમસ્તે!");
         }
         if (e.target.closest('.assistant-close')) {
             document.getElementById('aiAssistant').classList.remove('active');
@@ -129,7 +129,7 @@ function speak(text) {
 
 function processSmartQuery(query) {
     const q = query.toLowerCase();
-    let resp = "સમજાય તેમ બોલોને બેન.";
+    let resp = "હું સમજ્યો નહીં.";
     const m = appState.currentMonth;
     const y = appState.currentYear;
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
@@ -181,7 +181,9 @@ function processSmartQuery(query) {
     speak(resp);
 }
 
-// 3. OTHER
+// ==========================================
+// 3. UNIVERSAL MIC
+// ==========================================
 function initUniversalVoiceBtn() {
     const btn = document.createElement('div');
     btn.className = 'voice-float-btn';
@@ -198,13 +200,12 @@ function initUniversalVoiceBtn() {
         r.onresult = e => {
             let t = e.results[0][0].transcript;
             if(activeInput.type==='number') t=t.replace(/[૦-૯]/g,d=>"0123456789"["૦૧૨૩૪૫૬૭૮૯".indexOf(d)]).replace(/[^0-9.]/g,'');
-            activeInput.value = t; activeInput.dispatchEvent(new Event('change'));
-            // Trigger Save Manually for Voice
-            if(activeInput.oninput) activeInput.oninput();
+            activeInput.value = t; activeInput.dispatchEvent(new Event('input')); // Auto Save Trigger
         };
     } else btn.style.display='none';
 }
 
+// 4. CALENDAR
 function changeMonth(offset) {
     let m = appState.currentMonth + offset;
     let y = appState.currentYear;
@@ -254,7 +255,7 @@ function updateTotalBeneficiaries() {
     if(document.getElementById('totalCount')) document.getElementById('totalCount').innerText = t;
 }
 
-// Stock
+// 5. STOCK
 function loadStockData() {
     const m = document.getElementById('stockMonthSelector').value;
     const y = document.getElementById('stockYearSelector').value;
@@ -282,7 +283,6 @@ function saveStockData() {
     const m = document.getElementById('stockMonthSelector').value;
     const y = document.getElementById('stockYearSelector').value;
     localStorage.setItem(`stock_${y}_${m}`, JSON.stringify(appState.stock));
-    // Toast removed for auto-save to avoid spam
 }
 function clearStockData() { if(confirm("Sure?")){ appState.stock={}; saveStockData(); loadStockData(); }}
 
@@ -315,7 +315,7 @@ function saveMatruMandalStockData() {
     localStorage.setItem(`matruMandalStock_${y}_${m}`, JSON.stringify(appState.matruMandalStock));
 }
 
-// REPORT
+// 6. REPORT
 function generateReport(isDaily) {
     const container = document.getElementById('reportTableContainer');
     const m = parseInt(document.getElementById('reportMonthSelector').value);
@@ -430,7 +430,6 @@ function generateReport(isDaily) {
     });
     document.getElementById('reportSummaryTable').innerHTML = sumHtml;
     document.getElementById('reportSummaryContainer').style.display = 'block';
-    
     openPreview();
 }
 
@@ -454,7 +453,6 @@ function openPreview() {
                 <table class="wide-table">${document.getElementById('reportSummaryTable').innerHTML}</table>
             </div>
         </div>`;
-    
     document.getElementById('previewContent').innerHTML = content;
     document.getElementById('previewModal').style.display = 'block';
 }
@@ -524,22 +522,43 @@ function loadCenterInfo() {
     }
 }
 function saveCenterInfo() {
-    const cName = document.getElementById('centerNameHome');
-    const wName = document.getElementById('workerNameHome');
-    const sejo = document.getElementById('sejoHome');
-    const code = document.getElementById('centerCodeHome');
-    
-    // Safety Check
-    if(cName) appState.centerInfo.centerName = cName.value;
-    if(wName) appState.centerInfo.workerName = wName.value;
-    if(sejo) appState.centerInfo.sejo = sejo.value;
-    if(code) appState.centerInfo.centerCode = code.value;
-    
+    appState.centerInfo.centerName = document.getElementById('centerNameHome').value;
+    appState.centerInfo.workerName = document.getElementById('workerNameHome').value;
+    appState.centerInfo.sejo = document.getElementById('sejoHome').value;
+    appState.centerInfo.centerCode = document.getElementById('centerCodeHome').value;
     localStorage.setItem('centerInfo', JSON.stringify(appState.centerInfo));
-    showToast("માહિતી સેવ થઈ","success");
+    showToast("સેવ થયું","success");
 }
-function calculateAge(){ /* Logic */ }
-function calculateBMI(){ /* Logic */ }
+
+// AGE CALCULATOR (RESTORED)
+function calculateAge() {
+    const birthDate = new Date(document.getElementById('birthDate').value);
+    const currentDate = new Date(document.getElementById('currentDate').value);
+    
+    if (isNaN(birthDate)) {
+        showToast("જન્મ તારીખ નાખો", "error");
+        return;
+    }
+
+    let years = currentDate.getFullYear() - birthDate.getFullYear();
+    let months = currentDate.getMonth() - birthDate.getMonth();
+    let days = currentDate.getDate() - birthDate.getDate();
+
+    if (days < 0) {
+        months--;
+        days += new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+    }
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    document.getElementById('ageResult').innerText = `${years} વર્ષ, ${months} મહિના, ${days} દિવસ`;
+}
+
+function calculateBMI(){ 
+    // Logic Placeholder if needed
+}
 function appendToDisplay(v) { document.getElementById('calcDisplay').innerText += v; }
 function clearCalculator() { document.getElementById('calcDisplay').innerText = '0'; }
 function deleteLast() { let d=document.getElementById('calcDisplay'); d.innerText=d.innerText.slice(0,-1)||'0'; }
