@@ -21,15 +21,23 @@
                 <button id="passwordSubmit"><span class="material-icons">arrow_forward</span></button>
             </div>
             <div id="passwordError" class="error-message">ખોટો પાસવર્ડ!</div>
-            <div class="contact-box"><p>પાસવર્ડ માટે સંપર્ક</p><p class="number">mo. 9276505035</p></div>
+            <div class="contact-box">
+                <p>પાસવર્ડ માટે સંપર્ક</p>
+                <p class="number">mo. 9276505035 (Spark)</p>
+            </div>
         </div>
     </div>
 
     <div id="aiAssistant">
-        <div class="assistant-icon"><span class="material-icons">smart_toy</span></div>
+        <div class="assistant-icon">
+            <span class="material-icons" style="font-size: 2rem;">smart_toy</span>
+            <span class="assist-label">મને પૂછો</span>
+        </div>
         <div class="assistant-container">
             <div class="assistant-header">
-                <div style="display:flex; align-items:center; gap:10px;"><span class="material-icons">smart_toy</span><h3>સહાયક</h3></div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="material-icons">smart_toy</span><h3>સહાયક</h3>
+                </div>
                 <div class="assistant-close"><span class="material-icons">close</span></div>
             </div>
             <div class="assistant-messages" id="assistantMessages"></div>
@@ -47,13 +55,27 @@
         </header>
 
         <nav>
-            <button class="nav-btn active" onclick="showPage('homePage')"><span class="material-icons">home</span><span class="nav-label">હોમ</span></button>
-            <button class="nav-btn" onclick="showPage('beneficiaryPage')"><span class="material-icons">people</span><span class="nav-label">લાભાર્થી</span></button>
-            <button class="nav-btn" onclick="showPage('stockPage')"><span class="material-icons">inventory</span><span class="nav-label">સ્ટોક</span></button>
-            <button class="nav-btn" onclick="showPage('matruMandalStockPage')"><span class="material-icons">inventory_2</span><span class="nav-label">માતૃમંડળ</span></button>
-            <button class="nav-btn" onclick="showPage('reportPage')"><span class="material-icons">assessment</span><span class="nav-label">રિપોર્ટ</span></button>
-            <button class="nav-btn" onclick="showPage('billPage')"><span class="material-icons">receipt</span><span class="nav-label">બિલ</span></button>
-            <button class="nav-btn" onclick="showPage('toolsPage')"><span class="material-icons">build</span><span class="nav-label">ટૂલ્સ</span></button>
+            <button class="nav-btn active" onclick="showPage('homePage')">
+                <span class="material-icons">home</span><span class="nav-label">હોમ</span>
+            </button>
+            <button class="nav-btn" onclick="showPage('beneficiaryPage')">
+                <span class="material-icons">people</span><span class="nav-label">લાભાર્થી</span>
+            </button>
+            <button class="nav-btn" onclick="showPage('stockPage')">
+                <span class="material-icons">inventory</span><span class="nav-label">સ્ટોક</span>
+            </button>
+            <button class="nav-btn" onclick="showPage('matruMandalStockPage')">
+                <span class="material-icons">inventory_2</span><span class="nav-label">માતૃમંડળ</span>
+            </button>
+            <button class="nav-btn" onclick="showPage('reportPage')">
+                <span class="material-icons">assessment</span><span class="nav-label">રિપોર્ટ</span>
+            </button>
+            <button class="nav-btn" onclick="showPage('billPage')">
+                <span class="material-icons">receipt</span><span class="nav-label">બિલ</span>
+            </button>
+            <button class="nav-btn" onclick="showPage('toolsPage')">
+                <span class="material-icons">build</span><span class="nav-label">ટૂલ્સ</span>
+            </button>
         </nav>
 
         <div id="homePage" class="page active">
