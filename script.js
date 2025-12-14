@@ -77,7 +77,7 @@ function initializeAssistant() {
     document.body.addEventListener('click', function(e) {
         if (e.target.closest('.assistant-icon')) {
             document.getElementById('aiAssistant').classList.add('active');
-            speak("નમસ્તે! હું તૈયાર છું.");
+            speak("જય શ્રી કૃષ્ણ.");
         }
         if (e.target.closest('.assistant-close')) {
             document.getElementById('aiAssistant').classList.remove('active');
@@ -171,7 +171,7 @@ function speak(text) {
 
 function processSmartQuery(query) {
     const q = query.toLowerCase();
-    let resp = "હું સમજ્યો નહીં.";
+    let resp = "સમજાય તેવું બોલોને બેન....";
     const m = appState.currentMonth;
     const y = appState.currentYear;
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
