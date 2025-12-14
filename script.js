@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('passwordOverlay').style.display = 'flex';
     }
     document.getElementById('passwordSubmit').addEventListener('click', checkPassword);
+    
     initializeAssistant();
     initUniversalVoiceBtn();
 });
@@ -26,7 +27,9 @@ function checkPassword() {
     if (document.getElementById('passwordInput').value.trim() === CORRECT_PASSWORD) {
         sessionStorage.setItem('appAuthenticated', 'true');
         showApp();
-    } else showToast("ખોટો પાસવર્ડ!", "error");
+    } else {
+        showToast("ખોટો પાસવર્ડ!", "error");
+    }
 }
 
 function showApp() {
@@ -67,7 +70,7 @@ function showPage(pageId) {
 }
 
 // ==========================================
-// 2. AI ASSISTANT & VOICE
+// 2. AI ASSISTANT
 // ==========================================
 function initializeAssistant() {
     document.body.addEventListener('click', function(e) {
@@ -80,6 +83,7 @@ function initializeAssistant() {
             if('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
     });
+
     const btn = document.createElement('button');
     btn.innerHTML = '<span class="material-icons">mic</span>';
     btn.style = "border:none; background:none; color:#FF6B6B; cursor:pointer;";
@@ -102,6 +106,7 @@ function toggleChatVoice() {
 }
 
 function handleAssistantKeypress(e) { if(e.key==='Enter') sendMessage(); }
+
 function sendMessage() {
     const txt = document.getElementById('assistantInput').value;
     if(!txt) return;
@@ -109,11 +114,13 @@ function sendMessage() {
     document.getElementById('assistantInput').value='';
     setTimeout(() => processSmartQuery(txt), 600);
 }
+
 function addMessage(t, s) {
     const d = document.createElement('div'); d.className = `message ${s}`; d.innerText = t;
     const c = document.getElementById('assistantMessages');
     c.appendChild(d); c.scrollTop = c.scrollHeight;
 }
+
 function speak(text) {
     if ('speechSynthesis' in window) {
         try { const u = new SpeechSynthesisUtterance(text); u.lang = 'gu-IN'; window.speechSynthesis.speak(u); } catch(e){}
@@ -174,7 +181,9 @@ function processSmartQuery(query) {
     speak(resp);
 }
 
-// 3. UNIVERSAL MIC
+// ==========================================
+// 3. OTHER
+// ==========================================
 function initUniversalVoiceBtn() {
     const btn = document.createElement('div');
     btn.className = 'voice-float-btn';
@@ -196,7 +205,6 @@ function initUniversalVoiceBtn() {
     } else btn.style.display='none';
 }
 
-// 4. CALENDAR
 function changeMonth(offset) {
     let m = appState.currentMonth + offset;
     let y = appState.currentYear;
@@ -204,6 +212,7 @@ function changeMonth(offset) {
     appState.currentMonth = m; appState.currentYear = y;
     initializeSelectors(); loadCalendar();
 }
+
 function loadCalendar() {
     document.getElementById('calendarMonthDisplay').textContent = gujaratiMonths[appState.currentMonth];
     document.getElementById('calendarYearDisplay').textContent = appState.currentYear;
@@ -229,6 +238,7 @@ function loadCalendar() {
     container.innerHTML = html;
     updateTotalBeneficiaries();
 }
+
 function editBeneficiaryCount(d) {
     const dayOfWeek = new Date(appState.currentYear, appState.currentMonth, d).getDay();
     if(dayOfWeek===0) { showToast('રવિવારે રજા હોય!', 'error'); return; }
@@ -307,17 +317,21 @@ function saveMatruMandalStockData() {
 }
 
 // ==========================================
-// 6. DETAILED REPORT WITH TOTAL ROW
+// 6. DETAILED REPORT (TOTAL ROW FIX)
 // ==========================================
 function generateReport(isDaily) {
+    const container = document.getElementById('reportTableContainer');
     const m = parseInt(document.getElementById('reportMonthSelector').value);
     const y = parseInt(document.getElementById('reportYearSelector').value);
     const stockData = JSON.parse(localStorage.getItem(`stock_${y}_${m}`)) || {};
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
 
     const items = [
-        {id:'wheat', name:'ઘઉં', unit:'kg'}, {id:'rice', name:'ચોખા', unit:'kg'}, {id:'oil', name:'તેલ', unit:'lit'},
-        {id:'chana', name:'ચણા', unit:'kg'}, {id:'dal', name:'દાળ', unit:'kg'}
+        {id:'wheat', name:'ઘઉં', unit:'kg'}, 
+        {id:'rice', name:'ચોખા', unit:'kg'}, 
+        {id:'oil', name:'તેલ', unit:'lit'},
+        {id:'chana', name:'ચણા', unit:'kg'}, 
+        {id:'dal', name:'દાળ', unit:'kg'}
     ];
 
     let runningStock = {}, monthlyIncome = {}, totals = {};
@@ -327,11 +341,16 @@ function generateReport(isDaily) {
         totals[i.id] = { income: monthlyIncome[i.id], morning:0, afternoon:0, cons:0, closing:0 };
     });
 
-    let html = `<h3 style="text-align:center;">${gujaratiMonths[m]} ${y}</h3>`;
-    html += `<div style="overflow-x:auto;"><table class="wide-table"><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:5;">તા</th><th rowspan="2" style="position:sticky;left:35px;z-index:5;">લાભ</th>`;
-    items.forEach(i => html += `<th colspan="7">${i.name}</th>`); // 7 Columns now
+    let html = `<h3 style="text-align:center; color:#2c3e50; margin-bottom:10px;">${gujaratiMonths[m]} ${y}</h3>`;
+    html += `<div style="overflow-x:auto; max-height: 70vh;">`;
+    html += `<table class="wide-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="position:sticky; left:0; z-index:10; background:#2c3e50; color:white;">તારીખ</th>
+                        <th rowspan="2" style="position:sticky; left:35px; z-index:10; background:#2c3e50; color:white;">લાભાર્થી</th>`;
+    items.forEach(i => html += `<th colspan="7" style="border-bottom:2px solid white;">${i.name}</th>`);
     html += `</tr><tr>`;
-    items.forEach(() => html += `<th>ઓપ</th><th>આવક</th><th>કુલ</th><th>સવાર</th><th>બપોર</th><th>વપ</th><th>બંધ</th>`);
+    items.forEach(() => html += `<th>ઓપ</th><th>આવક</th><th>કુલ</th><th>સવાર</th><th>બપોર</th><th>કુલ વપરાશ</th><th>બંધ</th>`);
     html += `</tr></thead><tbody>`;
 
     const days = new Date(y, m+1, 0).getDate();
@@ -347,12 +366,12 @@ function generateReport(isDaily) {
 
         if(day===0) { 
              if(!isDaily || (isDaily && new Date(document.getElementById('reportDate').value).getDate() === d)) {
-                 html += `<tr style="background:#ffebee;"><td style="position:sticky;left:0;background:#ffebee;">${d}</td><td style="position:sticky;left:35px;background:#ffebee;">રજા</td><td colspan="35" style="text-align:center;">રવિવાર</td></tr>`;
+                 html += `<tr style="background:#ffebee;"><td style="position:sticky;left:0;background:#ffebee;">${d}</td><td style="position:sticky;left:35px;background:#ffebee;">રજા</td><td colspan="35" style="text-align:center; color:red; font-weight:bold;">રવિવાર</td></tr>`;
              }
              continue; 
         }
 
-        let row = `<tr><td style="position:sticky;left:0;background:#f8f9fa;">${d}</td><td style="position:sticky;left:35px;background:#f8f9fa;">${count}</td>`;
+        let row = `<tr><td style="position:sticky;left:0;background:#f8f9fa;font-weight:bold;">${d}</td><td style="position:sticky;left:35px;background:#f8f9fa;">${count}</td>`;
         
         items.forEach(item => {
             let open = runningStock[item.id];
@@ -373,9 +392,9 @@ function generateReport(isDaily) {
             totals[item.id].morning += morn;
             totals[item.id].afternoon += after;
             totals[item.id].cons += totalUse;
-            totals[item.id].closing = close; // Last closing
+            totals[item.id].closing = close;
 
-            row += `<td>${open.toFixed(3)}</td><td>${income>0?income.toFixed(3):'-'}</td><td>${avail.toFixed(3)}</td><td>${morn>0?morn.toFixed(3):'-'}</td><td>${after>0?after.toFixed(3):'-'}</td><td style="background:#fff3e0;">${totalUse.toFixed(3)}</td><td style="font-weight:bold;">${close.toFixed(3)}</td>`;
+            row += `<td>${open.toFixed(3)}</td><td>${income>0?income.toFixed(3):'-'}</td><td>${avail.toFixed(3)}</td><td>${morn>0?morn.toFixed(3):'-'}</td><td>${after>0?after.toFixed(3):'-'}</td><td style="background:#fff3e0; font-weight:bold;">${totalUse.toFixed(3)}</td><td style="background:#e8f5e9; font-weight:bold; color:#2e7d32;">${close.toFixed(3)}</td>`;
         });
         row += `</tr>`;
         
@@ -383,31 +402,32 @@ function generateReport(isDaily) {
             html += row;
         }
     }
-    
-    // === TOTAL ROW (FOOTER) ===
+    html += `</tbody>`;
+
+    // === GRAND TOTAL ROW (WHITE BACKGROUND FIX) ===
     if(!isDaily) {
-        html += `<tr style="background:#2c3e50; color:white; font-weight:bold;">
-                    <td style="position:sticky;left:0;background:#2c3e50;z-index:5;">-</td>
-                    <td style="position:sticky;left:35px;background:#2c3e50;z-index:5;">કુલ</td>`;
+        html += `<tfoot>
+                    <tr style="background:white; color:black; font-weight:bold; border-top:3px solid black; border-bottom:1px solid black;">
+                        <td style="position:sticky; left:0; background:white; color:black; z-index:10;">-</td>
+                        <td style="position:sticky; left:35px; background:white; color:black; z-index:10;">કુલ</td>`;
         
         items.forEach(i => {
             html += `
-                <td>-</td>
-                <td>${totals[i.id].income.toFixed(3)}</td>
-                <td>-</td>
-                <td>${totals[i.id].morning.toFixed(3)}</td>
-                <td>${totals[i.id].afternoon.toFixed(3)}</td>
-                <td style="background:#e67e22; color:white;">${totals[i.id].cons.toFixed(3)}</td>
-                <td style="background:#27ae60; color:white;">${totals[i.id].closing.toFixed(3)}</td>
+                <td style="background:white; color:black;">-</td>
+                <td style="background:white; color:black;">${totals[i.id].income.toFixed(3)}</td>
+                <td style="background:white; color:black;">-</td>
+                <td style="background:white; color:black;">${totals[i.id].morning.toFixed(3)}</td>
+                <td style="background:white; color:black;">${totals[i.id].afternoon.toFixed(3)}</td>
+                <td style="background:#ffecb3; color:black;">${totals[i.id].cons.toFixed(3)}</td>
+                <td style="background:#c8e6c9; color:black;">${totals[i.id].closing.toFixed(3)}</td>
             `;
         });
-        html += `</tr>`;
+        html += `</tr></tfoot>`;
     }
 
-    html += `</tbody></table></div>`;
-    document.getElementById('reportTableContainer').innerHTML = html;
+    html += `</table></div>`;
+    container.innerHTML = html;
 
-    // Summary Table Update
     let sumHtml = `<tr><th>વસ્તુ</th><th>આવક</th><th>સવાર</th><th>બપોર</th><th>કુલ વપરાશ</th><th>બંધ સિલક</th></tr>`;
     items.forEach(i => {
         sumHtml += `<tr><td>${i.name}</td><td>${totals[i.id].income.toFixed(3)}</td><td>${totals[i.id].morning.toFixed(3)}</td><td>${totals[i.id].afternoon.toFixed(3)}</td><td style="color:red;font-weight:bold;">${totals[i.id].cons.toFixed(3)}</td><td style="color:green;font-weight:bold;">${totals[i.id].closing.toFixed(3)}</td></tr>`;
