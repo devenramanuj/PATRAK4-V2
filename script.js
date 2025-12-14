@@ -18,8 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('passwordOverlay').style.display = 'flex';
     }
     document.getElementById('passwordSubmit').addEventListener('click', checkPassword);
-    
-    // Init Features
     initializeAssistant();
     initUniversalVoiceBtn();
 });
@@ -28,9 +26,7 @@ function checkPassword() {
     if (document.getElementById('passwordInput').value.trim() === CORRECT_PASSWORD) {
         sessionStorage.setItem('appAuthenticated', 'true');
         showApp();
-    } else {
-        showToast("ખોટો પાસવર્ડ!", "error");
-    }
+    } else showToast("ખોટો પાસવર્ડ!", "error");
 }
 
 function showApp() {
@@ -71,20 +67,19 @@ function showPage(pageId) {
 }
 
 // ==========================================
-// 2. AI ASSISTANT (SMART BRAIN RESTORED)
+// 2. AI ASSISTANT & VOICE
 // ==========================================
 function initializeAssistant() {
     document.body.addEventListener('click', function(e) {
         if (e.target.closest('.assistant-icon')) {
             document.getElementById('aiAssistant').classList.add('active');
-            speak("નમસ્તે! હું ગણતરી કરી શકું છું.");
+            speak("નમસ્તે!");
         }
         if (e.target.closest('.assistant-close')) {
             document.getElementById('aiAssistant').classList.remove('active');
             if('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
     });
-
     const btn = document.createElement('button');
     btn.innerHTML = '<span class="material-icons">mic</span>';
     btn.style = "border:none; background:none; color:#FF6B6B; cursor:pointer;";
@@ -95,134 +90,96 @@ function initializeAssistant() {
 
 function toggleChatVoice() {
     if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const r = new SpeechRecognition();
-        r.lang = 'gu-IN';
-        r.onstart = () => { document.getElementById('assistantInput').placeholder = "સાંભળી રહ્યો છું..."; };
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const r = new SR(); r.lang='gu-IN';
+        r.onstart = () => document.getElementById('assistantInput').placeholder = "સાંભળી રહ્યો છું...";
         r.onresult = (e) => {
             document.getElementById('assistantInput').value = e.results[0][0].transcript;
             sendMessage();
         };
         r.start();
-    } else {
-        showToast("માઈક સપોર્ટ નથી", "error");
-    }
+    } else showToast("માઈક સપોર્ટ નથી", "error");
 }
 
 function handleAssistantKeypress(e) { if(e.key==='Enter') sendMessage(); }
-
 function sendMessage() {
     const txt = document.getElementById('assistantInput').value;
     if(!txt) return;
-    
     addMessage(txt, 'user');
-    document.getElementById('assistantInput').value = '';
-    
-    // થોડી વાર પછી ગણતરી કરીને જવાબ આપશે
+    document.getElementById('assistantInput').value='';
     setTimeout(() => processSmartQuery(txt), 600);
 }
-
 function addMessage(t, s) {
     const d = document.createElement('div'); d.className = `message ${s}`; d.innerText = t;
     const c = document.getElementById('assistantMessages');
-    c.appendChild(d);
-    c.scrollTop = c.scrollHeight;
+    c.appendChild(d); c.scrollTop = c.scrollHeight;
 }
-
 function speak(text) {
     if ('speechSynthesis' in window) {
-        try {
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'gu-IN';
-            window.speechSynthesis.speak(u);
-        } catch(e) { console.log(e); }
+        try { const u = new SpeechSynthesisUtterance(text); u.lang = 'gu-IN'; window.speechSynthesis.speak(u); } catch(e){}
     }
 }
 
-// === THE BRAIN IS BACK (ગણતરીનું લોજિક) ===
 function processSmartQuery(query) {
     const q = query.toLowerCase();
-    let resp = "હું સમજ્યો નહીં. ફરીથી પૂછો.";
-    
-    // ડેટા લોડ કરો
+    let resp = "હું સમજ્યો નહીં.";
     const m = appState.currentMonth;
     const y = appState.currentYear;
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
     const stockData = JSON.parse(localStorage.getItem(`stock_${y}_${m}`)) || {};
     
-    // 1. વસ્તુ ઓળખો
-    let item = null;
-    let itemName = "";
-    let unit = "કિલો";
-    
-    if (q.includes('ઘઉં')) { item = 'wheat'; itemName = 'ઘઉં'; }
-    else if (q.includes('ચોખા')) { item = 'rice'; itemName = 'ચોખા'; }
-    else if (q.includes('તેલ')) { item = 'oil'; itemName = 'તેલ'; unit = "લિટર"; }
-    else if (q.includes('ચણા')) { item = 'chana'; itemName = 'ચણા'; }
-    else if (q.includes('દાળ')) { item = 'dal'; itemName = 'દાળ'; }
+    let item = null; let unit = "કિલો"; let itemName="";
+    if (q.includes('ઘઉં')) { item='wheat'; itemName='ઘઉં'; }
+    else if (q.includes('ચોખા')) { item='rice'; itemName='ચોખા'; }
+    else if (q.includes('તેલ')) { item='oil'; itemName='તેલ'; unit="લિટર"; }
+    else if (q.includes('ચણા')) { item='chana'; itemName='ચણા'; }
+    else if (q.includes('દાળ')) { item='dal'; itemName='દાળ'; }
 
-    // 2. વપરાશની ગણતરી (Consumption Logic)
     if (item && (q.includes('વપરાશ') || q.includes('કેટલું'))) {
         let totalVal = 0;
-        let daysCount = new Date(y, m+1, 0).getDate();
-        
-        // સવાર કે બપોર?
+        const days = new Date(y, m+1, 0).getDate();
         let isMorning = q.includes('સવાર');
         let isAfternoon = q.includes('બપોર');
-        let isTotal = !isMorning && !isAfternoon; // જો કંઈ ન બોલે તો કુલ ગણવું
-
-        for(let d=1; d<=daysCount; d++) {
+        for(let d=1; d<=days; d++) {
             const date = new Date(y, m, d);
             const day = date.getDay();
             const count = benData[d] || 0;
-            if(day === 0 || count === 0) continue;
-
-            let morn = 0, after = 0;
+            if(day===0 || count===0) continue;
+            let mUse=0, aUse=0;
+            if(item==='wheat') { if([1,3,4,5,6].includes(day)) mUse=0.030*count; if([1,2,5].includes(day)) aUse=0.050*count; }
+            if(item==='rice') { if(day===2) mUse=0.030*count; if([3,4,6].includes(day)) aUse=0.050*count; }
+            if(item==='oil') { if([1,2,3,4,5,6].includes(day)) { mUse=0.005*count; aUse=0.008*count; } }
+            if(item==='chana' && [2,4,5].includes(day)) aUse=0.020*count;
+            if(item==='dal' && [1,3].includes(day)) aUse=0.020*count;
             
-            // Rules from Report Logic
-            if(item==='wheat') { if([1,3,4,5,6].includes(day)) morn=0.030*count; if([1,2,5].includes(day)) after=0.050*count; }
-            if(item==='rice') { if(day===2) morn=0.030*count; if([3,4,6].includes(day)) after=0.050*count; }
-            if(item==='oil') { if([1,2,3,4,5,6].includes(day)) { morn=0.005*count; after=0.008*count; } }
-            if(item==='chana' && [2,4,5].includes(day)) after=0.020*count;
-            if(item==='dal' && [1,3].includes(day)) after=0.020*count;
-
-            if (isMorning) totalVal += morn;
-            else if (isAfternoon) totalVal += after;
-            else totalVal += (morn + after);
+            if (isMorning) totalVal += mUse;
+            else if (isAfternoon) totalVal += aUse;
+            else totalVal += (mUse + aUse);
         }
-        
-        let timeStr = isMorning ? "સવારની" : (isAfternoon ? "બપોરની" : "કુલ");
-        resp = `આ મહિનામાં ${itemName}ની ${timeStr} વપરાશ ${totalVal.toFixed(3)} ${unit} છે.`;
+        resp = `આ મહિનામાં ${itemName}ની ${isMorning?"સવારની":(isAfternoon?"બપોરની":"કુલ")} વપરાશ ${totalVal.toFixed(3)} ${unit} છે.`;
     } 
-    // 3. સ્ટોકની પૂછપરછ
-    else if (item && (q.includes('સ્ટોક') || q.includes('સિલક'))) {
-        let open = parseFloat(stockData[`${item}_open`]) || 0;
-        let inc = parseFloat(stockData[`${item}_income`]) || 0;
-        resp = `${itemName}નો ઓપનિંગ સ્ટોક ${open} છે અને આવક ${inc} છે.`;
-    }
-    // 4. લાભાર્થી પૂછપરછ
     else if (q.includes('લાભાર્થી')) {
         let t = 0; for(let k in benData) t += benData[k];
-        resp = `આ મહિનામાં કુલ ${t} લાભાર્થી હાજરી પુરાઈ છે.`;
+        resp = `કુલ લાભાર્થી: ${t}`;
     }
-    // 5. જનરલ
-    else if (q.includes('કેમ છો')) {
-        resp = "હું મજામાં છું! તમે કેમ છો?";
+    else if (q.includes('સ્ટોક')) {
+        if(item) {
+             let o = parseFloat(stockData[`${item}_open`])||0;
+             let i = parseFloat(stockData[`${item}_income`])||0;
+             resp = `${itemName}: ઓપનિંગ ${o}, આવક ${i}`;
+        } else resp = "કોનો સ્ટોક?";
     }
-
+    
     addMessage(resp, 'assistant');
     speak(resp);
 }
 
-// ==========================================
-// 3. OTHER FUNCTIONS (Calendar, Stock, etc.)
-// ==========================================
+// 3. UNIVERSAL MIC
 function initUniversalVoiceBtn() {
     const btn = document.createElement('div');
     btn.className = 'voice-float-btn';
     btn.innerHTML = '<span class="material-icons">mic</span>';
     document.body.appendChild(btn);
-    
     let activeInput;
     document.addEventListener('focusin', e => { if(e.target.tagName==='INPUT') activeInput = e.target; });
     
@@ -239,6 +196,7 @@ function initUniversalVoiceBtn() {
     } else btn.style.display='none';
 }
 
+// 4. CALENDAR
 function changeMonth(offset) {
     let m = appState.currentMonth + offset;
     let y = appState.currentYear;
@@ -246,17 +204,14 @@ function changeMonth(offset) {
     appState.currentMonth = m; appState.currentYear = y;
     initializeSelectors(); loadCalendar();
 }
-
 function loadCalendar() {
     document.getElementById('calendarMonthDisplay').textContent = gujaratiMonths[appState.currentMonth];
     document.getElementById('calendarYearDisplay').textContent = appState.currentYear;
     const key = `beneficiaries_${appState.currentYear}_${appState.currentMonth}`;
     appState.beneficiaries = JSON.parse(localStorage.getItem(key)) || {};
-    
     const container = document.getElementById('calendarContainer');
     const firstDay = new Date(appState.currentYear, appState.currentMonth, 1).getDay();
     const daysInMonth = new Date(appState.currentYear, appState.currentMonth + 1, 0).getDate();
-    
     let html = '<div class="calendar">';
     gujaratiDays.forEach(d => html += `<div class="calendar-header">${d}</div>`);
     for(let i=0; i<firstDay; i++) html += '<div></div>';
@@ -274,7 +229,6 @@ function loadCalendar() {
     container.innerHTML = html;
     updateTotalBeneficiaries();
 }
-
 function editBeneficiaryCount(d) {
     const dayOfWeek = new Date(appState.currentYear, appState.currentMonth, d).getDay();
     if(dayOfWeek===0) { showToast('રવિવારે રજા હોય!', 'error'); return; }
@@ -290,7 +244,7 @@ function updateTotalBeneficiaries() {
     if(document.getElementById('totalCount')) document.getElementById('totalCount').innerText = t;
 }
 
-// Stock & Report
+// 5. STOCK
 function loadStockData() {
     const m = document.getElementById('stockMonthSelector').value;
     const y = document.getElementById('stockYearSelector').value;
@@ -352,85 +306,127 @@ function saveMatruMandalStockData() {
     showToast('સેવ થયું', 'success');
 }
 
-// REPORT
+// ==========================================
+// 6. DETAILED REPORT WITH TOTAL ROW
+// ==========================================
 function generateReport(isDaily) {
     const m = parseInt(document.getElementById('reportMonthSelector').value);
     const y = parseInt(document.getElementById('reportYearSelector').value);
     const stockData = JSON.parse(localStorage.getItem(`stock_${y}_${m}`)) || {};
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
-    const items = [{id:'wheat',name:'ઘઉં'},{id:'rice',name:'ચોખા'},{id:'oil',name:'તેલ'},{id:'chana',name:'ચણા'},{id:'dal',name:'દાળ'}];
-    
-    let runningStock={}, monthlyIncome={}, totals={};
-    items.forEach(i=>{
-        runningStock[i.id]=parseFloat(stockData[`${i.id}_open`])||0;
-        monthlyIncome[i.id]=parseFloat(stockData[`${i.id}_income`])||0;
-        totals[i.id]={income:monthlyIncome[i.id],cons:0,closing:0};
+
+    const items = [
+        {id:'wheat', name:'ઘઉં', unit:'kg'}, {id:'rice', name:'ચોખા', unit:'kg'}, {id:'oil', name:'તેલ', unit:'lit'},
+        {id:'chana', name:'ચણા', unit:'kg'}, {id:'dal', name:'દાળ', unit:'kg'}
+    ];
+
+    let runningStock = {}, monthlyIncome = {}, totals = {};
+    items.forEach(i => {
+        runningStock[i.id] = parseFloat(stockData[`${i.id}_open`]) || 0;
+        monthlyIncome[i.id] = parseFloat(stockData[`${i.id}_income`]) || 0;
+        totals[i.id] = { income: monthlyIncome[i.id], morning:0, afternoon:0, cons:0, closing:0 };
     });
 
-    let html=`<h3 style="text-align:center;">${gujaratiMonths[m]} ${y}</h3><div style="overflow-x:auto;"><table class="wide-table"><thead><tr><th rowspan="2" style="position:sticky;left:0;">તા</th><th rowspan="2">લાભ</th>`;
-    items.forEach(i=>html+=`<th colspan="6">${i.name}</th>`);
-    html+=`</tr><tr>`;
-    items.forEach(()=>html+=`<th>ઓપ</th><th>આવક</th><th>કુલ</th><th>સવાર</th><th>બપોર</th><th>બંધ</th>`);
-    html+=`</tr></thead><tbody>`;
+    let html = `<h3 style="text-align:center;">${gujaratiMonths[m]} ${y}</h3>`;
+    html += `<div style="overflow-x:auto;"><table class="wide-table"><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:5;">તા</th><th rowspan="2" style="position:sticky;left:35px;z-index:5;">લાભ</th>`;
+    items.forEach(i => html += `<th colspan="7">${i.name}</th>`); // 7 Columns now
+    html += `</tr><tr>`;
+    items.forEach(() => html += `<th>ઓપ</th><th>આવક</th><th>કુલ</th><th>સવાર</th><th>બપોર</th><th>વપ</th><th>બંધ</th>`);
+    html += `</tr></thead><tbody>`;
 
-    const days=new Date(y,m+1,0).getDate();
-    for(let d=1; d<=days; d++){
-        const date=new Date(y,m,d);
-        const day=date.getDay();
-        const count=benData[d]||0;
-        if(isDaily){
-            const selDate=new Date(document.getElementById('reportDate').value);
-            if(date.getDate()!==selDate.getDate()) continue;
+    const days = new Date(y, m+1, 0).getDate();
+    for(let d=1; d<=days; d++) {
+        const date = new Date(y, m, d);
+        const day = date.getDay();
+        const count = benData[d] || 0;
+
+        if(isDaily) {
+            const selDate = new Date(document.getElementById('reportDate').value);
+            if(date.getDate() !== selDate.getDate()) continue;
         }
+
         if(day===0) { 
              if(!isDaily || (isDaily && new Date(document.getElementById('reportDate').value).getDate() === d)) {
-                 html+=`<tr style="background:#ffebee;"><td>${d}</td><td>રજા</td><td colspan="30" style="text-align:center;">રવિવાર</td></tr>`;
+                 html += `<tr style="background:#ffebee;"><td style="position:sticky;left:0;background:#ffebee;">${d}</td><td style="position:sticky;left:35px;background:#ffebee;">રજા</td><td colspan="35" style="text-align:center;">રવિવાર</td></tr>`;
              }
              continue; 
         }
 
-        let row=`<tr><td style="position:sticky;left:0;background:#f8f9fa;">${d}</td><td>${count}</td>`;
-        items.forEach(item=>{
-            let open=runningStock[item.id];
-            let income=(d===1)?monthlyIncome[item.id]:0;
-            let avail=open+income;
-            let morn=0,after=0;
-            if(item.id==='wheat'){if([1,3,4,5,6].includes(day))morn=0.030*count; if([1,2,5].includes(day))after=0.050*count;}
-            if(item.id==='rice'){if(day===2)morn=0.030*count; if([3,4,6].includes(day))after=0.050*count;}
-            if(item.id==='oil'){if([1,2,3,4,5,6].includes(day)){morn=0.005*count;after=0.008*count;}}
-            if(item.id==='chana'&&[2,4,5].includes(day))after=0.020*count;
-            if(item.id==='dal'&&[1,3].includes(day))after=0.020*count;
+        let row = `<tr><td style="position:sticky;left:0;background:#f8f9fa;">${d}</td><td style="position:sticky;left:35px;background:#f8f9fa;">${count}</td>`;
+        
+        items.forEach(item => {
+            let open = runningStock[item.id];
+            let income = (d===1) ? monthlyIncome[item.id] : 0;
+            let avail = open + income;
             
-            let used=morn+after;
-            let close=avail-used;
-            runningStock[item.id]=close;
-            totals[item.id].cons+=used; totals[item.id].closing=close;
+            let morn=0, after=0;
+            if(item.id==='wheat') { if([1,3,4,5,6].includes(day)) morn=0.030*count; if([1,2,5].includes(day)) after=0.050*count; }
+            if(item.id==='rice') { if(day===2) morn=0.030*count; if([3,4,6].includes(day)) after=0.050*count; }
+            if(item.id==='oil') { if([1,2,3,4,5,6].includes(day)) { morn=0.005*count; after=0.008*count; } }
+            if(item.id==='chana' && [2,4,5].includes(day)) after=0.020*count;
+            if(item.id==='dal' && [1,3].includes(day)) after=0.020*count;
 
-            row+=`<td>${open.toFixed(3)}</td><td>${income>0?income.toFixed(3):'-'}</td><td>${avail.toFixed(3)}</td><td>${morn>0?morn.toFixed(3):'-'}</td><td>${after>0?after.toFixed(3):'-'}</td><td style="font-weight:bold;">${close.toFixed(3)}</td>`;
+            let totalUse = morn + after;
+            let close = avail - totalUse;
+            
+            runningStock[item.id] = close;
+            totals[item.id].morning += morn;
+            totals[item.id].afternoon += after;
+            totals[item.id].cons += totalUse;
+            totals[item.id].closing = close; // Last closing
+
+            row += `<td>${open.toFixed(3)}</td><td>${income>0?income.toFixed(3):'-'}</td><td>${avail.toFixed(3)}</td><td>${morn>0?morn.toFixed(3):'-'}</td><td>${after>0?after.toFixed(3):'-'}</td><td style="background:#fff3e0;">${totalUse.toFixed(3)}</td><td style="font-weight:bold;">${close.toFixed(3)}</td>`;
         });
-        row+=`</tr>`;
-        if(!isDaily || (isDaily && new Date(document.getElementById('reportDate').value).getDate() === d)) html+=row;
+        row += `</tr>`;
+        
+        if(!isDaily || (isDaily && new Date(document.getElementById('reportDate').value).getDate() === d)) {
+            html += row;
+        }
     }
-    html+=`</tbody></table></div>`;
-    document.getElementById('reportTableContainer').innerHTML=html;
+    
+    // === TOTAL ROW (FOOTER) ===
+    if(!isDaily) {
+        html += `<tr style="background:#2c3e50; color:white; font-weight:bold;">
+                    <td style="position:sticky;left:0;background:#2c3e50;z-index:5;">-</td>
+                    <td style="position:sticky;left:35px;background:#2c3e50;z-index:5;">કુલ</td>`;
+        
+        items.forEach(i => {
+            html += `
+                <td>-</td>
+                <td>${totals[i.id].income.toFixed(3)}</td>
+                <td>-</td>
+                <td>${totals[i.id].morning.toFixed(3)}</td>
+                <td>${totals[i.id].afternoon.toFixed(3)}</td>
+                <td style="background:#e67e22; color:white;">${totals[i.id].cons.toFixed(3)}</td>
+                <td style="background:#27ae60; color:white;">${totals[i.id].closing.toFixed(3)}</td>
+            `;
+        });
+        html += `</tr>`;
+    }
 
-    let sumHtml=`<tr><th>વસ્તુ</th><th>આવક</th><th>વપરાશ</th><th>સિલક</th></tr>`;
-    items.forEach(i=>{
-        sumHtml+=`<tr><td>${i.name}</td><td>${totals[i.id].income.toFixed(3)}</td><td style="color:red;">${totals[i.id].cons.toFixed(3)}</td><td style="color:green;font-weight:bold;">${totals[i.id].closing.toFixed(3)}</td></tr>`;
+    html += `</tbody></table></div>`;
+    document.getElementById('reportTableContainer').innerHTML = html;
+
+    // Summary Table Update
+    let sumHtml = `<tr><th>વસ્તુ</th><th>આવક</th><th>સવાર</th><th>બપોર</th><th>કુલ વપરાશ</th><th>બંધ સિલક</th></tr>`;
+    items.forEach(i => {
+        sumHtml += `<tr><td>${i.name}</td><td>${totals[i.id].income.toFixed(3)}</td><td>${totals[i.id].morning.toFixed(3)}</td><td>${totals[i.id].afternoon.toFixed(3)}</td><td style="color:red;font-weight:bold;">${totals[i.id].cons.toFixed(3)}</td><td style="color:green;font-weight:bold;">${totals[i.id].closing.toFixed(3)}</td></tr>`;
     });
-    document.getElementById('reportSummaryTable').innerHTML=sumHtml;
+    document.getElementById('reportSummaryTable').innerHTML = sumHtml;
+    document.getElementById('reportSummaryContainer').style.display = 'block';
+    
     openPreview();
 }
 
 function openPreview() {
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     const summaryHTML = document.getElementById('reportSummaryContainer').innerHTML;
-    if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ બનાવો", "error"); return; }
+    if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
     
     const content = `
         <div style="font-family:Arial; padding:10px; background:white;">
             <div class="preview-buttons">
-                <button class="btn" style="background:#673AB7;" onclick="printPreview()">🖨️ Print</button>
+                <button class="btn" style="background:#673AB7;" onclick="printPreview()">🖨️ પ્રિન્ટ</button>
                 <button class="btn btn-success" onclick="downloadPDF()">📄 PDF</button>
                 <button class="btn" style="background:#25D366;" onclick="shareOnWhatsApp()">📱 WhatsApp</button>
             </div>
@@ -438,11 +434,15 @@ function openPreview() {
             ${reportHTML}
             <br>
             <h3 style="text-align:center;">માસિક સમરી</h3>
-            <div style="overflow-x:auto;"><table class="wide-table">${document.getElementById('reportSummaryTable').innerHTML}</table></div>
+            <div style="overflow-x:auto;">
+                <table class="wide-table">${document.getElementById('reportSummaryTable').innerHTML}</table>
+            </div>
         </div>`;
+    
     document.getElementById('previewContent').innerHTML = content;
     document.getElementById('previewModal').style.display = 'block';
 }
+
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 function printPreview() { window.print(); }
 function downloadPDF() {
@@ -461,8 +461,17 @@ function downloadPDF() {
 }
 function shareOnWhatsApp() { window.open(`https://wa.me/?text=Report`, '_blank'); }
 
-// Bills & Utils
-function calculateMasalaAmounts() { /* Logic kept same */ }
+// 7. BILL
+function calculateMasalaAmounts() {
+    const m = document.getElementById('billMonthSelector').value || appState.currentMonth;
+    const y = document.getElementById('billYearSelector').value || appState.currentYear;
+    const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
+    let total = 0; for(let k in benData) total += benData[k];
+    if(document.getElementById('masala1Amount')) document.getElementById('masala1Amount').innerText = (total*1).toFixed(2);
+    if(document.getElementById('masala2Amount')) document.getElementById('masala2Amount').innerText = (total*1.6).toFixed(2);
+    if(document.getElementById('masala3Amount')) document.getElementById('masala3Amount').innerText = (total*1.3).toFixed(2);
+    if(document.getElementById('totalMasalaAmount')) document.getElementById('totalMasalaAmount').innerText = ((total*1)+(total*1.6)+(total*1.3)).toFixed(2);
+}
 function generateMasala130Certificate() { fillCert('130', 1.30); }
 function generateMasala160Certificate() { fillCert('160', 1.60); }
 function generateMasala100Certificate() { fillCert('100', 1.00); }
@@ -471,20 +480,44 @@ function fillCert(s, r) {
     const y = document.getElementById('billYearSelector').value;
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
     let total = 0; for(let k in benData) total += benData[k];
-    if(total===0) { showToast("લાભાર્થી નથી!", "error"); return; }
+    if(total===0) { showToast("કોઈ લાભાર્થી નથી!", "error"); return; }
     
     const setText = (id, val) => { const e=document.getElementById(id); if(e) e.innerText=val; };
     setText(`centerName${s}`, document.getElementById('centerName').value || appState.centerInfo.centerName);
+    setText(`workerName${s}`, document.getElementById('workerName').value || appState.centerInfo.workerName);
+    setText(`workerName${s}Sign`, document.getElementById('workerName').value || appState.centerInfo.workerName);
+    setText(`supervisorName${s}`, document.getElementById('supervisorName').value);
+    setText(`registerPage${s}`, document.getElementById('registerPage').value);
+    setText(`certificateDate${s}`, document.getElementById('certificateDate').value);
     setText(`beneficiaries${s}`, total);
     setText(`submittedAmount${s}`, (total*r).toFixed(2));
     document.getElementById(`certificateModal${s}`).style.display = 'block';
 }
 function closeCertificate(id) { document.getElementById(id).style.display = 'none'; }
+
+// 8. UTILS
 function showToast(m,t) { const x=document.getElementById('toast'); x.textContent=m; x.className=`toast show ${t}`; setTimeout(()=>x.classList.remove('show'),3000); }
-function loadCenterInfo() { /* ... */ }
-function saveCenterInfo() { showToast("સેવ થયું","success"); }
-function calculateAge(){ /* ... */ }
-function calculateBMI(){ /* ... */ }
+function loadCenterInfo() {
+    const info = JSON.parse(localStorage.getItem('centerInfo'));
+    if(info) {
+        appState.centerInfo = info;
+        if(document.getElementById('centerNameHome')) document.getElementById('centerNameHome').value = info.centerName;
+        if(document.getElementById('centerName')) document.getElementById('centerName').value = info.centerName;
+        ['workerName','sejo','centerCode'].forEach(k => {
+            if(document.getElementById(k+'Home')) document.getElementById(k+'Home').value = info[k];
+        });
+    }
+}
+function saveCenterInfo() {
+    appState.centerInfo.centerName = document.getElementById('centerNameHome').value;
+    appState.centerInfo.workerName = document.getElementById('workerNameHome').value;
+    appState.centerInfo.sejo = document.getElementById('sejoHome').value;
+    appState.centerInfo.centerCode = document.getElementById('centerCodeHome').value;
+    localStorage.setItem('centerInfo', JSON.stringify(appState.centerInfo));
+    showToast("સેવ થયું","success");
+}
+function calculateAge(){ /* Logic */ }
+function calculateBMI(){ /* Logic */ }
 function appendToDisplay(v) { document.getElementById('calcDisplay').innerText += v; }
 function clearCalculator() { document.getElementById('calcDisplay').innerText = '0'; }
 function deleteLast() { let d=document.getElementById('calcDisplay'); d.innerText=d.innerText.slice(0,-1)||'0'; }
