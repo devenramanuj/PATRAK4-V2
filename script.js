@@ -181,9 +181,7 @@ function processSmartQuery(query) {
     speak(resp);
 }
 
-// ==========================================
 // 3. OTHER
-// ==========================================
 function initUniversalVoiceBtn() {
     const btn = document.createElement('div');
     btn.className = 'voice-float-btn';
@@ -201,6 +199,8 @@ function initUniversalVoiceBtn() {
             let t = e.results[0][0].transcript;
             if(activeInput.type==='number') t=t.replace(/[૦-૯]/g,d=>"0123456789"["૦૧૨૩૪૫૬૭૮૯".indexOf(d)]).replace(/[^0-9.]/g,'');
             activeInput.value = t; activeInput.dispatchEvent(new Event('change'));
+            // Trigger Save Manually for Voice
+            if(activeInput.oninput) activeInput.oninput();
         };
     } else btn.style.display='none';
 }
@@ -254,7 +254,7 @@ function updateTotalBeneficiaries() {
     if(document.getElementById('totalCount')) document.getElementById('totalCount').innerText = t;
 }
 
-// 5. STOCK
+// Stock
 function loadStockData() {
     const m = document.getElementById('stockMonthSelector').value;
     const y = document.getElementById('stockYearSelector').value;
@@ -282,7 +282,7 @@ function saveStockData() {
     const m = document.getElementById('stockMonthSelector').value;
     const y = document.getElementById('stockYearSelector').value;
     localStorage.setItem(`stock_${y}_${m}`, JSON.stringify(appState.stock));
-    showToast('સ્ટોક સેવ થયો', 'success');
+    // Toast removed for auto-save to avoid spam
 }
 function clearStockData() { if(confirm("Sure?")){ appState.stock={}; saveStockData(); loadStockData(); }}
 
@@ -313,12 +313,9 @@ function saveMatruMandalStockData() {
     const m = document.getElementById('matruMandalStockMonthSelector').value;
     const y = document.getElementById('matruMandalStockYearSelector').value;
     localStorage.setItem(`matruMandalStock_${y}_${m}`, JSON.stringify(appState.matruMandalStock));
-    showToast('સેવ થયું', 'success');
 }
 
-// ==========================================
-// 6. DETAILED REPORT (TOTAL ROW FIX)
-// ==========================================
+// REPORT
 function generateReport(isDaily) {
     const container = document.getElementById('reportTableContainer');
     const m = parseInt(document.getElementById('reportMonthSelector').value);
@@ -404,7 +401,6 @@ function generateReport(isDaily) {
     }
     html += `</tbody>`;
 
-    // === GRAND TOTAL ROW (WHITE BACKGROUND FIX) ===
     if(!isDaily) {
         html += `<tfoot>
                     <tr style="background:white; color:black; font-weight:bold; border-top:3px solid black; border-bottom:1px solid black;">
@@ -522,19 +518,25 @@ function loadCenterInfo() {
     if(info) {
         appState.centerInfo = info;
         if(document.getElementById('centerNameHome')) document.getElementById('centerNameHome').value = info.centerName;
-        if(document.getElementById('centerName')) document.getElementById('centerName').value = info.centerName;
-        ['workerName','sejo','centerCode'].forEach(k => {
-            if(document.getElementById(k+'Home')) document.getElementById(k+'Home').value = info[k];
-        });
+        if(document.getElementById('workerNameHome')) document.getElementById('workerNameHome').value = info.workerName;
+        if(document.getElementById('sejoHome')) document.getElementById('sejoHome').value = info.sejo;
+        if(document.getElementById('centerCodeHome')) document.getElementById('centerCodeHome').value = info.centerCode;
     }
 }
 function saveCenterInfo() {
-    appState.centerInfo.centerName = document.getElementById('centerNameHome').value;
-    appState.centerInfo.workerName = document.getElementById('workerNameHome').value;
-    appState.centerInfo.sejo = document.getElementById('sejoHome').value;
-    appState.centerInfo.centerCode = document.getElementById('centerCodeHome').value;
+    const cName = document.getElementById('centerNameHome');
+    const wName = document.getElementById('workerNameHome');
+    const sejo = document.getElementById('sejoHome');
+    const code = document.getElementById('centerCodeHome');
+    
+    // Safety Check
+    if(cName) appState.centerInfo.centerName = cName.value;
+    if(wName) appState.centerInfo.workerName = wName.value;
+    if(sejo) appState.centerInfo.sejo = sejo.value;
+    if(code) appState.centerInfo.centerCode = code.value;
+    
     localStorage.setItem('centerInfo', JSON.stringify(appState.centerInfo));
-    showToast("સેવ થયું","success");
+    showToast("માહિતી સેવ થઈ","success");
 }
 function calculateAge(){ /* Logic */ }
 function calculateBMI(){ /* Logic */ }
