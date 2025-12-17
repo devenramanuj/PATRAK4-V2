@@ -280,7 +280,6 @@ function generateReport(isDaily) {
         items.forEach(item => {
             let open=runningStock[item.id], income=(d===1)?monthlyIncome[item.id]:0, avail=open+income;
             let morn=0, after=0;
-            // Logic shortened for brevity but functional
             if(item.id==='wheat') { if([1,3,4,5,6].includes(day)) morn=0.030*count; if([1,2,5].includes(day)) after=0.050*count; }
             if(item.id==='rice') { if(day===2) morn=0.030*count; if([3,4,6].includes(day)) after=0.050*count; }
             if(item.id==='oil') { if(day!==0) { morn=0.005*count; after=0.008*count; } }
@@ -296,7 +295,6 @@ function generateReport(isDaily) {
     html+=`</tbody></table></div>`;
     container.innerHTML=html;
 
-    // Summary Table
     let sumHtml=`<tr><th>વસ્તુ</th><th>આવક</th><th>સવાર</th><th>બપોર</th><th>કુલ વપરાશ</th><th>બંધ સિલક</th></tr>`;
     items.forEach(i=>sumHtml+=`<tr><td>${i.name}</td><td>${totals[i.id].income.toFixed(3)}</td><td>${totals[i.id].morning.toFixed(3)}</td><td>${totals[i.id].afternoon.toFixed(3)}</td><td style="color:red;">${totals[i.id].cons.toFixed(3)}</td><td style="color:green;">${totals[i.id].closing.toFixed(3)}</td></tr>`);
     document.getElementById('reportSummaryTable').innerHTML=sumHtml;
@@ -308,7 +306,6 @@ function openPreview() {
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
     
-    // Preview Content with IDs for direct access
     const content = `
         <div id="pdfPrintContent" style="font-family:Arial; padding:10px; background:white; width:100%;">
             <div class="preview-buttons" style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
@@ -330,17 +327,16 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** ERROR FIXED: CALCULATE HEIGHT FROM CANVAS, NOT PDF OBJECT ***
+// *** FINAL FIX: DYNAMIC WIDTH CALCULATION FOR WIDE TABLES ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
     const element = document.getElementById('previewContent');
     const btnContainer = document.querySelector('.preview-buttons');
-    const scrollableDiv = document.querySelector('#pdfReportTable > div'); // The div with scrollbar
+    const scrollableDiv = document.querySelector('#pdfReportTable > div'); 
 
     showToast("PDF બની રહ્યું છે... કૃપા કરીને રાહ જુઓ", "success");
 
-    // 1. Save Original Styles
     const originalStyles = {
         overflow: element.style.overflow,
         height: element.style.height,
@@ -348,46 +344,44 @@ async function handlePDFAction(action) {
         divOverflow: scrollableDiv ? scrollableDiv.style.overflow : ''
     };
 
-    // 2. Hide Buttons temporarily
     if(btnContainer) btnContainer.style.display = 'none';
 
-    // 3. Force Expand Element (No Scrollbars)
+    // *** FIX: Get the REAL width of the table (could be 2000px+) ***
+    const table = document.querySelector('.wide-table');
+    const requiredWidth = table ? Math.max(table.scrollWidth + 50, 1500) : 1500;
+
     element.style.overflow = 'visible';
     element.style.height = 'auto';
-    element.style.width = '1000px'; // Force desktop width for table
+    element.style.width = requiredWidth + 'px'; // Set to actual table width
     element.style.background = 'white';
     
-    // Force the inner table div to show full content
     if(scrollableDiv) {
         scrollableDiv.style.overflow = 'visible';
         scrollableDiv.style.maxHeight = 'none';
     }
 
     try {
-        // 4. Capture Screenshot
         const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
-            windowWidth: 1000, 
+            windowWidth: requiredWidth, // Capture full width
             scrollY: -window.scrollY 
         });
 
-        // 5. Restore Styles IMMEDIATELY
         element.style.overflow = originalStyles.overflow;
         element.style.height = originalStyles.height;
         element.style.width = originalStyles.width;
         if(scrollableDiv) scrollableDiv.style.overflow = originalStyles.divOverflow;
         if(btnContainer) btnContainer.style.display = 'flex';
 
-        // 6. Generate PDF (FIXED LOGIC)
         const imgData = canvas.toDataURL('image/png');
         const { jsPDF } = window.jspdf;
-        const pdfW = 210; // A4 Width in mm
         
-        // --- FIX IS HERE: Use canvas math instead of pdf object ---
+        // Use Landscape ('l') for wide tables
+        const pdfW = 297; // A4 Landscape width in mm
         const pdfH = (canvas.height * pdfW) / canvas.width;
 
-        const pdf = new jsPDF('p', 'mm', [pdfW, pdfH + 10]);
+        const pdf = new jsPDF('l', 'mm', [pdfW, pdfH + 10]);
         pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
 
         const fileName = "Anganwadi_Report.pdf";
@@ -412,13 +406,11 @@ async function handlePDFAction(action) {
         }
 
     } catch (err) {
-        // Restore styles if error occurs
         element.style.overflow = originalStyles.overflow;
         element.style.height = originalStyles.height;
         element.style.width = originalStyles.width;
         if(scrollableDiv) scrollableDiv.style.overflow = originalStyles.divOverflow;
         if(btnContainer) btnContainer.style.display = 'flex';
-        
         console.error(err);
         alert("Error: " + err.message);
     }
