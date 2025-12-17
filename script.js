@@ -172,7 +172,7 @@ function processSmartQuery(query) {
     else if (q.includes('પ્રિન્ટ') || q.includes('print')) {
         if(document.getElementById('reportPage').classList.contains('active')) {
             openPreview();
-            setTimeout(printPreview, 500); // Wait for modal
+            setTimeout(printPreview, 500); 
             resp = "રિપોર્ટ પ્રિન્ટ કરી રહ્યો છું...";
         } else {
             window.print();
@@ -345,7 +345,7 @@ function saveMatruMandalStockData() {
     localStorage.setItem(`matruMandalStock_${y}_${m}`, JSON.stringify(appState.matruMandalStock));
 }
 
-// 5. REPORT (IMPROVED PDF & SHARE)
+// 5. REPORT (FIXED PDF & WHATSAPP)
 function generateReport(isDaily) {
     const container = document.getElementById('reportTableContainer');
     const m = parseInt(document.getElementById('reportMonthSelector').value);
@@ -495,43 +495,62 @@ function openPreview() {
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 function printPreview() { window.print(); }
 
+// *** NEW PDF FUNCTION (NO CUT OFF) ***
 async function handlePDFAction(action) {
-    const element = document.getElementById('previewContent');
-    const btnContainer = document.querySelector('.preview-buttons');
-
-    if(btnContainer) btnContainer.style.display = 'none';
-    showToast("PDF બની રહ્યું છે... થોડી વાર લાગશે", "success");
-
-    const originalOverflow = element.style.overflow;
-    const originalHeight = element.style.height;
+    const originalElement = document.getElementById('previewContent');
     
-    element.style.overflow = 'visible';
-    element.style.height = 'auto';
-    element.style.background = 'white';
-    element.style.width = '100%'; 
+    showToast("PDF પ્રોસેસ ચાલુ છે... કૃપા કરીને રાહ જુઓ", "success");
+
+    // 1. CLONE ELEMENT (To remove scrollbars/height limits)
+    const clone = originalElement.cloneNode(true);
+    
+    clone.style.width = '1000px'; 
+    clone.style.height = 'auto';  
+    clone.style.position = 'absolute';
+    clone.style.top = '-10000px'; 
+    clone.style.left = '0';
+    clone.style.overflow = 'visible'; 
+    clone.style.background = 'white';
+    
+    // Remove buttons from clone
+    const btnDiv = clone.querySelector('.preview-buttons');
+    if(btnDiv) btnDiv.remove();
+
+    // REMOVE MAX-HEIGHT FROM INNER DIVS (Critical Fix)
+    const scrollableDivs = clone.querySelectorAll('div');
+    scrollableDivs.forEach(div => {
+        div.style.maxHeight = 'none';
+        div.style.overflow = 'visible';
+    });
+
+    document.body.appendChild(clone);
 
     try {
-        const canvas = await html2canvas(element, {
+        const canvas = await html2canvas(clone, {
             scale: 2, 
             useCORS: true,
-            scrollY: -window.scrollY
+            windowWidth: 1000 
         });
 
-        element.style.overflow = originalOverflow;
-        element.style.height = originalHeight;
-        if(btnContainer) btnContainer.style.display = 'flex';
+        document.body.removeChild(clone);
 
+        // 2. GENERATE PDF (Dynamic Height)
         const imgData = canvas.toDataURL('image/png');
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4'); 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        const pdfW = 210; // A4 width mm
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfH = (imgProps.height * pdfW) / imgProps.width;
 
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        const pdf = new jsPDF('p', 'mm', [pdfW, pdfH + 10]); 
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
 
+        const fileName = "Anganwadi_Report.pdf";
+
+        // 3. SHARE OR DOWNLOAD
         if (action === 'share') {
             const pdfBlob = pdf.output('blob');
-            const file = new File([pdfBlob], "Anganwadi_Report.pdf", { type: "application/pdf" });
+            const file = new File([pdfBlob], fileName, { type: "application/pdf" });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
@@ -540,20 +559,18 @@ async function handlePDFAction(action) {
                     text: 'જુઓ આંગણવાડી પત્રક રિપોર્ટ PDF'
                 });
             } else {
-                alert("તમારા ડિવાઇસમાં શેરિંગ સપોર્ટેડ નથી, ફાઈલ ડાઉનલોડ થશે.");
-                pdf.save('Anganwadi_Report.pdf');
+                pdf.save(fileName);
+                alert("તમારા મોબાઈલમાં ડાયરેક્ટ શેરિંગ સપોર્ટ નથી, ફાઈલ ડાઉનલોડ થઈ છે.");
             }
         } else {
-            pdf.save('Anganwadi_Report.pdf');
+            pdf.save(fileName);
             showToast("PDF ડાઉનલોડ થયું!", "success");
         }
 
     } catch (err) {
         console.error(err);
         showToast("Error: " + err.message, "error");
-        element.style.overflow = originalOverflow;
-        element.style.height = originalHeight;
-        if(btnContainer) btnContainer.style.display = 'flex';
+        if(document.body.contains(clone)) document.body.removeChild(clone);
     }
 }
 
