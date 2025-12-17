@@ -69,7 +69,7 @@ function showPage(pageId) {
 }
 
 // ==========================================
-// 2. AI ASSISTANT (SMART COMMANDS ADDED)
+// 2. AI ASSISTANT (SMART COMMANDS)
 // ==========================================
 function initializeAssistant() {
     document.body.addEventListener('click', function(e) {
@@ -181,7 +181,7 @@ function processSmartQuery(query) {
         actionTaken = true;
     }
 
-    // --- 3. CALCULATION LOGIC (If no command executed) ---
+    // --- 3. CALCULATION LOGIC ---
     if (!actionTaken) {
         const m = appState.currentMonth;
         const y = appState.currentYear;
@@ -345,7 +345,7 @@ function saveMatruMandalStockData() {
     localStorage.setItem(`matruMandalStock_${y}_${m}`, JSON.stringify(appState.matruMandalStock));
 }
 
-// 5. REPORT
+// 5. REPORT (IMPROVED PDF & SHARE)
 function generateReport(isDaily) {
     const container = document.getElementById('reportTableContainer');
     const m = parseInt(document.getElementById('reportMonthSelector').value);
@@ -369,7 +369,7 @@ function generateReport(isDaily) {
     });
 
     let html = `<h3 style="text-align:center; color:#2c3e50; margin-bottom:10px;">${gujaratiMonths[m]} ${y}</h3>`;
-    html += `<div style="overflow-x:auto; max-height: 70vh;">`;
+    html += `<div style="overflow-x:auto;">`;
     html += `<table class="wide-table">
                 <thead>
                     <tr>
@@ -467,14 +467,18 @@ function generateReport(isDaily) {
 function openPreview() {
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     const summaryHTML = document.getElementById('reportSummaryContainer').innerHTML;
-    if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
+    
+    if(!reportHTML || reportHTML.includes("બટન દબાવો")) { 
+        showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); 
+        return; 
+    }
     
     const content = `
-        <div style="font-family:Arial; padding:10px; background:white;">
-            <div class="preview-buttons">
-                <button class="btn" style="background:#673AB7;" onclick="printPreview()">🖨️ પ્રિન્ટ</button>
-                <button class="btn btn-success" onclick="downloadPDF()">📄 PDF</button>
-                <button class="btn" style="background:#25D366;" onclick="shareOnWhatsApp()">📱 WhatsApp</button>
+        <div id="pdfContent" style="font-family:Arial; padding:10px; background:white;">
+            <div class="preview-buttons" style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
+                <button class="btn" style="background:#673AB7; color:white;" onclick="printPreview()">🖨️ પ્રિન્ટ</button>
+                <button class="btn btn-success" onclick="handlePDFAction('download')">📄 ડાઉનલોડ PDF</button>
+                <button class="btn" style="background:#25D366; color:white;" onclick="handlePDFAction('share')">📱 WhatsApp Share</button>
             </div>
             <h2 style="text-align:center;">આંગણવાડી સ્ટોક પત્રક</h2>
             ${reportHTML}
@@ -490,21 +494,68 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 function printPreview() { window.print(); }
-function downloadPDF() {
-    const el = document.getElementById('previewContent');
-    showToast("PDF બની રહ્યું છે...", "success");
-    html2canvas(el, { scale: 2 }).then(c => {
-        const img = c.toDataURL('image/png');
+
+async function handlePDFAction(action) {
+    const element = document.getElementById('previewContent');
+    const btnContainer = document.querySelector('.preview-buttons');
+
+    if(btnContainer) btnContainer.style.display = 'none';
+    showToast("PDF બની રહ્યું છે... થોડી વાર લાગશે", "success");
+
+    const originalOverflow = element.style.overflow;
+    const originalHeight = element.style.height;
+    
+    element.style.overflow = 'visible';
+    element.style.height = 'auto';
+    element.style.background = 'white';
+    element.style.width = '100%'; 
+
+    try {
+        const canvas = await html2canvas(element, {
+            scale: 2, 
+            useCORS: true,
+            scrollY: -window.scrollY
+        });
+
+        element.style.overflow = originalOverflow;
+        element.style.height = originalHeight;
+        if(btnContainer) btnContainer.style.display = 'flex';
+
+        const imgData = canvas.toDataURL('image/png');
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'mm', 'a4');
-        const w = doc.internal.pageSize.getWidth();
-        const h = (c.height * w) / c.width;
-        doc.addImage(img, 'PNG', 0, 0, w, h);
-        doc.save('Report.pdf');
-        showToast("PDF ડાઉનલોડ થયું!", "success");
-    });
+        const pdf = new jsPDF('p', 'mm', 'a4'); 
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+        if (action === 'share') {
+            const pdfBlob = pdf.output('blob');
+            const file = new File([pdfBlob], "Anganwadi_Report.pdf", { type: "application/pdf" });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'આંગણવાડી રિપોર્ટ',
+                    text: 'જુઓ આંગણવાડી પત્રક રિપોર્ટ PDF'
+                });
+            } else {
+                alert("તમારા ડિવાઇસમાં શેરિંગ સપોર્ટેડ નથી, ફાઈલ ડાઉનલોડ થશે.");
+                pdf.save('Anganwadi_Report.pdf');
+            }
+        } else {
+            pdf.save('Anganwadi_Report.pdf');
+            showToast("PDF ડાઉનલોડ થયું!", "success");
+        }
+
+    } catch (err) {
+        console.error(err);
+        showToast("Error: " + err.message, "error");
+        element.style.overflow = originalOverflow;
+        element.style.height = originalHeight;
+        if(btnContainer) btnContainer.style.display = 'flex';
+    }
 }
-function shareOnWhatsApp() { window.open(`https://wa.me/?text=Report`, '_blank'); }
 
 // 6. BILL
 function calculateMasalaAmounts() {
