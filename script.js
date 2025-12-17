@@ -2,6 +2,9 @@
 // 1. AUTH & INIT
 // ==========================================
 const CORRECT_PASSWORD = "Dev123";
+// ગ્લોબલ વેરિયેબલ શેરિંગ માટે
+let generatedFileForShare = null;
+
 const appState = {
     currentMonth: new Date().getMonth(),
     currentYear: new Date().getFullYear(),
@@ -303,6 +306,9 @@ function generateReport(isDaily) {
 }
 
 function openPreview() {
+    // RESET GLOBAL SHARE VAR
+    generatedFileForShare = null;
+    
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
     
@@ -311,7 +317,7 @@ function openPreview() {
             <div class="preview-buttons" style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
                 <button class="btn" style="background:#673AB7; color:white;" onclick="window.print()">🖨️ Print</button>
                 <button class="btn btn-success" onclick="handlePDFAction('download')">📄 PDF Download</button>
-                <button class="btn" style="background:#25D366; color:white;" onclick="handlePDFAction('share')">📱 WhatsApp</button>
+                <button id="btnShare" class="btn" style="background:#25D366; color:white;" onclick="handlePDFAction('share')">📱 WhatsApp</button>
             </div>
             <h2 style="text-align:center;">આંગણવાડી સ્ટોક પત્રક</h2>
             <div id="pdfReportTable">${reportHTML}</div>
@@ -327,15 +333,45 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** FINAL WIDTH FIX: 2500px Safety Buffer ***
+// *** FINAL FIX: 2-STEP SHARING LOGIC ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
+    const shareBtn = document.getElementById('btnShare');
+
+    // === STEP 2: SHARE IF READY ===
+    if(action === 'share' && generatedFileForShare) {
+        try {
+            await navigator.share({
+                files: [generatedFileForShare],
+                title: 'આંગણવાડી રિપોર્ટ',
+                text: 'જુઓ આંગણવાડી પત્રક રિપોર્ટ PDF'
+            });
+            // Reset after success
+            generatedFileForShare = null;
+            if(shareBtn) {
+                shareBtn.innerHTML = '📱 WhatsApp';
+                shareBtn.style.background = '#25D366';
+            }
+        } catch(e) {
+            console.log("Share cancelled or failed", e);
+        }
+        return; 
+    }
+
+    // === STEP 1: GENERATE ===
     const element = document.getElementById('previewContent');
     const btnContainer = document.querySelector('.preview-buttons');
     const scrollableDiv = document.querySelector('#pdfReportTable > div'); 
 
-    showToast("PDF બની રહ્યું છે... કૃપા કરીને રાહ જુઓ", "success");
+    // Visual Feedback
+    const originalText = shareBtn ? shareBtn.innerHTML : '';
+    if(action === 'share' && shareBtn) {
+        shareBtn.innerHTML = '⏳ બની રહ્યું છે...';
+        showToast("PDF બની રહ્યું છે... કૃપા કરીને રાહ જુઓ", "success");
+    } else {
+        showToast("PDF ડાઉનલોડ થઈ રહ્યું છે...", "success");
+    }
 
     const originalStyles = {
         overflow: element.style.overflow,
@@ -346,7 +382,7 @@ async function handlePDFAction(action) {
 
     if(btnContainer) btnContainer.style.display = 'none';
 
-    // *** SUPER WIDE WIDTH FORCE (2500px) ***
+    // Force Wide
     const table = document.querySelector('.wide-table');
     const requiredWidth = table ? Math.max(table.scrollWidth + 250, 2500) : 2500;
 
@@ -364,11 +400,12 @@ async function handlePDFAction(action) {
         const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
-            width: requiredWidth, // Force Width
+            width: requiredWidth,
             windowWidth: requiredWidth,
             scrollY: -window.scrollY 
         });
 
+        // Restore styles immediately
         element.style.overflow = originalStyles.overflow;
         element.style.height = originalStyles.height;
         element.style.width = originalStyles.width;
@@ -377,11 +414,8 @@ async function handlePDFAction(action) {
 
         const imgData = canvas.toDataURL('image/png');
         const { jsPDF } = window.jspdf;
-        
-        // A4 Landscape
         const pdfW = 297; 
         const pdfH = (canvas.height * pdfW) / canvas.width;
-
         const pdf = new jsPDF('l', 'mm', [pdfW, pdfH + 10]);
         pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
 
@@ -390,16 +424,15 @@ async function handlePDFAction(action) {
         if (action === 'share') {
             const pdfBlob = pdf.output('blob');
             const file = new File([pdfBlob], fileName, { type: "application/pdf" });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'આંગણવાડી રિપોર્ટ',
-                    text: 'જુઓ આંગણવાડી પત્રક રિપોર્ટ PDF'
-                });
-            } else {
-                alert("તમારા મોબાઈલમાં ડાયરેક્ટ શેરિંગ સપોર્ટ નથી. ફાઈલ ડાઉનલોડ થશે.");
-                pdf.save(fileName);
+            
+            // SAVE FILE GLOBALLY
+            generatedFileForShare = file;
+            
+            // UPDATE BUTTON FOR STEP 2
+            if(shareBtn) {
+                shareBtn.innerHTML = '📤 હવે મોકલો (ક્લિક કરો)';
+                shareBtn.style.background = '#e91e63'; // Pink/Red color to notice
+                showToast("PDF તૈયાર છે! હવે 'મોકલો' બટન દબાવો.", "success");
             }
         } else {
             pdf.save(fileName);
@@ -412,6 +445,8 @@ async function handlePDFAction(action) {
         element.style.width = originalStyles.width;
         if(scrollableDiv) scrollableDiv.style.overflow = originalStyles.divOverflow;
         if(btnContainer) btnContainer.style.display = 'flex';
+        
+        if(action === 'share' && shareBtn) shareBtn.innerHTML = originalText;
         console.error(err);
         alert("Error: " + err.message);
     }
