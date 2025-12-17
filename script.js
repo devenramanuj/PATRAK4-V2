@@ -2,7 +2,7 @@
 // 1. AUTH & INIT
 // ==========================================
 const CORRECT_PASSWORD = "Dev123";
-// ગ્લોબલ વેરિયેબલ શેરિંગ માટે
+// ગ્લોબલ વેરિયેબલ શેરિંગ માટે (મહત્વનું)
 let generatedFileForShare = null;
 
 const appState = {
@@ -306,7 +306,7 @@ function generateReport(isDaily) {
 }
 
 function openPreview() {
-    // RESET GLOBAL SHARE VAR
+    // RESET GLOBAL SHARE VAR (દર વખતે નવેસરથી શરૂ કરવા)
     generatedFileForShare = null;
     
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
@@ -333,7 +333,7 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** FINAL FIX: 2-STEP SHARING LOGIC ***
+// *** FINAL FIX: 2-STEP SHARING WITH ERROR ALERT & FALLBACK ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
@@ -347,14 +347,29 @@ async function handlePDFAction(action) {
                 title: 'આંગણવાડી રિપોર્ટ',
                 text: 'જુઓ આંગણવાડી પત્રક રિપોર્ટ PDF'
             });
-            // Reset after success
+            // Success reset
             generatedFileForShare = null;
             if(shareBtn) {
                 shareBtn.innerHTML = '📱 WhatsApp';
                 shareBtn.style.background = '#25D366';
             }
         } catch(e) {
-            console.log("Share cancelled or failed", e);
+            // ERROR ALERT + FALLBACK
+            alert("WhatsApp શેરિંગ નિષ્ફળ ગયું છે (Error: " + e.message + ").\n\nચિંતા કરશો નહીં, PDF ડાઉનલોડ થઈ રહી છે. તમે તેને ફાઈલ મેનેજર માંથી શેર કરી શકો છો.");
+            
+            // Auto Download Fallback
+            const url = URL.createObjectURL(generatedFileForShare);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "Anganwadi_Report.pdf";
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            generatedFileForShare = null;
+            if(shareBtn) {
+                shareBtn.innerHTML = '📱 WhatsApp';
+                shareBtn.style.background = '#25D366';
+            }
         }
         return; 
     }
@@ -382,7 +397,6 @@ async function handlePDFAction(action) {
 
     if(btnContainer) btnContainer.style.display = 'none';
 
-    // Force Wide
     const table = document.querySelector('.wide-table');
     const requiredWidth = table ? Math.max(table.scrollWidth + 250, 2500) : 2500;
 
@@ -431,7 +445,7 @@ async function handlePDFAction(action) {
             // UPDATE BUTTON FOR STEP 2
             if(shareBtn) {
                 shareBtn.innerHTML = '📤 હવે મોકલો (ક્લિક કરો)';
-                shareBtn.style.background = '#e91e63'; // Pink/Red color to notice
+                shareBtn.style.background = '#e91e63'; 
                 showToast("PDF તૈયાર છે! હવે 'મોકલો' બટન દબાવો.", "success");
             }
         } else {
