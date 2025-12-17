@@ -2,8 +2,7 @@
 // 1. AUTH & INIT
 // ==========================================
 const CORRECT_PASSWORD = "Dev123";
-// ગ્લોબલ વેરિયેબલ (ફાઈલ સાચવવા માટે)
-let globalFileForShare = null;
+let generatedFileForShare = null; // Global variable for sharing
 
 const appState = {
     currentMonth: new Date().getMonth(),
@@ -72,13 +71,13 @@ function showPage(pageId) {
 }
 
 // ==========================================
-// 2. AI ASSISTANT
+// 2. AI ASSISTANT (UPDATED SMART LOGIC)
 // ==========================================
 function initializeAssistant() {
     document.body.addEventListener('click', function(e) {
         if (e.target.closest('.assistant-icon')) {
             document.getElementById('aiAssistant').classList.add('active');
-            speak("જય શ્રી કૃષ્ણ.");
+            speak("જય શ્રી કૃષ્ણ. બોલો શું મદદ કરું?");
         }
         if (e.target.closest('.assistant-close')) {
             document.getElementById('aiAssistant').classList.remove('active');
@@ -138,11 +137,17 @@ function speak(text) {
     }
 }
 
+// *** SMART QUERY PROCESSOR (Fixes "Tilak" vs "Silak") ***
 function processSmartQuery(query) {
-    const q = query.toLowerCase();
-    let resp = "સમજાય તેવું બોલોને બેન...";
+    // 1. Text Cleanup (Auto-Correct common hearing errors)
+    let q = query.toLowerCase();
+    q = q.replace(/તિલક/g, 'સિલક');  // Fix Tilak -> Silak
+    q = q.replace(/ઉગાડતી/g, 'ઉઘડતી'); // Fix Ugadti -> Ughadti
+    
+    let resp = "માફ કરશો, હું સમજી શકી નથી. ફરી બોલો.";
     let actionTaken = false;
 
+    // 2. Navigation
     if (q.includes('રિપોર્ટ') && (q.includes('ખોલો') || q.includes('પેજ'))) { showPage('reportPage'); resp = "રિપોર્ટ પેજ ખોલ્યું."; actionTaken = true; } 
     else if (q.includes('બિલ') && (q.includes('ખોલો') || q.includes('પેજ'))) { showPage('billPage'); resp = "બિલ પેજ ખોલ્યું."; actionTaken = true; }
     else if (q.includes('સ્ટોક') && (q.includes('ખોલો') || q.includes('પેજ'))) { showPage('stockPage'); resp = "સ્ટોક પેજ ખોલ્યું."; actionTaken = true; }
@@ -155,12 +160,73 @@ function processSmartQuery(query) {
         actionTaken = true;
     }
 
+    // 3. Data Query (Opening / Closing Stock)
     if (!actionTaken) {
-        resp = "માફ કરશો, હું આ સમજી શકી નથી."; 
+        const m = appState.currentMonth;
+        const y = appState.currentYear;
+        const stockData = JSON.parse(localStorage.getItem(`stock_${y}_${m}`)) || {};
+        
+        let item = null; let itemName = ""; let unit = "kg";
+        if (q.includes('ઘઉં')) { item='wheat'; itemName='ઘઉં'; }
+        else if (q.includes('ચોખા')) { item='rice'; itemName='ચોખા'; }
+        else if (q.includes('તેલ')) { item='oil'; itemName='તેલ'; unit="lit"; }
+        else if (q.includes('ચણા')) { item='chana'; itemName='ચણા'; }
+        else if (q.includes('દાળ')) { item='dal'; itemName='દાળ'; }
+
+        // Logic for Stock Queries
+        if (item) {
+            // Get Opening & Income
+            let open = parseFloat(stockData[`${item}_open`]) || 0;
+            let income = parseFloat(stockData[`${item}_income`]) || 0;
+            
+            if (q.includes('ઉઘડતી') || q.includes('ઓપનિંગ')) {
+                resp = `${gujaratiMonths[m]} મહિનાની ${itemName}ની ઉઘડતી સિલક ${open} ${unit} છે.`;
+            } 
+            else if (q.includes('આવક')) {
+                resp = `${gujaratiMonths[m]} મહિનાની ${itemName}ની આવક ${income} ${unit} છે.`;
+            }
+            else if (q.includes('બંધ') || q.includes('આખર') || q.includes('સિલક')) {
+                // Calculate Usage to find Closing Stock
+                let usage = calculateUsage(item, m, y);
+                let closing = (open + income) - usage;
+                resp = `${itemName}ની બંધ સિલક (અંદાજિત): ${closing.toFixed(3)} ${unit}`;
+            }
+            else {
+                resp = `${itemName}: ઓપનિંગ ${open}, આવક ${income}`;
+            }
+        } 
+        else if (q.includes('લાભાર્થી')) {
+             const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
+             let total = 0; for(let k in benData) total += benData[k];
+             resp = `આ મહિનામાં કુલ હાજરી (લાભાર્થી દિવસો): ${total}`;
+        }
     }
     
     addMessage(resp, 'assistant');
     speak(resp);
+}
+
+// Helper to calculate usage for voice assistant
+function calculateUsage(item, m, y) {
+    const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
+    let totalUsage = 0;
+    const days = new Date(y, m+1, 0).getDate();
+    
+    for(let d=1; d<=days; d++) {
+        const date = new Date(y, m, d);
+        const day = date.getDay();
+        const count = benData[d] || 0;
+        if(day===0 || count===0) continue;
+
+        let mUse=0, aUse=0;
+        if(item==='wheat') { if([1,3,4,5,6].includes(day)) mUse=0.030*count; if([1,2,5].includes(day)) aUse=0.050*count; }
+        if(item==='rice') { if(day===2) mUse=0.030*count; if([3,4,6].includes(day)) aUse=0.050*count; }
+        if(item==='oil') { if(day!==0) { mUse=0.005*count; aUse=0.008*count; } }
+        if(item==='chana' && [2,4,5].includes(day)) aUse=0.020*count;
+        if(item==='dal' && [1,3].includes(day)) aUse=0.020*count;
+        totalUsage += (mUse + aUse);
+    }
+    return totalUsage;
 }
 
 // 3. CALENDAR & STOCK
@@ -306,9 +372,7 @@ function generateReport(isDaily) {
 }
 
 function openPreview() {
-    // RESET GLOBAL SHARE VAR (દર વખતે નવેસરથી શરૂ કરવા)
-    globalFileForShare = null;
-    
+    generatedFileForShare = null;
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
     
@@ -333,103 +397,58 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** FINAL FIX: 2-STEP SHARING WITH SMOOTH FALLBACK (NO ERROR MSG) ***
+// *** FINAL FIX: 2-STEP SHARING WITH SMOOTH FALLBACK ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
     const shareBtn = document.getElementById('btnShare');
 
-    // === STEP 2: SHARE IF READY ===
-    if(action === 'share' && globalFileForShare) {
+    if(action === 'share' && generatedFileForShare) {
         try {
-            // Check if device supports sharing files
-            if(navigator.canShare && navigator.canShare({ files: [globalFileForShare] })) {
+            if(navigator.canShare && navigator.canShare({ files: [generatedFileForShare] })) {
                 await navigator.share({
-                    files: [globalFileForShare]
-                    // removed title/text to avoid permission errors
+                    files: [generatedFileForShare]
                 });
-                
-                // If successful
-                globalFileForShare = null;
-                if(shareBtn) {
-                    shareBtn.innerHTML = '📱 WhatsApp';
-                    shareBtn.style.background = '#25D366';
-                }
-            } else {
-                // If canShare returns false, force error to trigger fallback
-                throw new Error("Device does not support file sharing");
-            }
+                generatedFileForShare = null;
+                if(shareBtn) { shareBtn.innerHTML = '📱 WhatsApp'; shareBtn.style.background = '#25D366'; }
+            } else { throw new Error("Sharing not supported"); }
         } catch(e) {
-            // SILENT FALLBACK: Don't show scary error
-            // Just inform user about download
-            alert("તમારા મોબાઈલમાં ડાયરેક્ટ શેરિંગ સપોર્ટ નથી, તેથી PDF ડાઉનલોડ થઈ રહી છે. તમે 'Downloads' ફોલ્ડર માંથી તેને મોકલી શકો છો.");
-            
-            const url = URL.createObjectURL(globalFileForShare);
+            alert("ડાયરેક્ટ શેરિંગ શક્ય નથી. PDF ડાઉનલોડ થઈ રહી છે.");
+            const url = URL.createObjectURL(generatedFileForShare);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = "Anganwadi_Report.pdf";
-            a.click();
+            a.href = url; a.download = "Anganwadi_Report.pdf"; a.click();
             URL.revokeObjectURL(url);
-            
-            globalFileForShare = null;
-            if(shareBtn) {
-                shareBtn.innerHTML = '📱 WhatsApp';
-                shareBtn.style.background = '#25D366';
-            }
+            generatedFileForShare = null;
+            if(shareBtn) { shareBtn.innerHTML = '📱 WhatsApp'; shareBtn.style.background = '#25D366'; }
         }
         return; 
     }
 
-    // === STEP 1: GENERATE ===
     const element = document.getElementById('previewContent');
     const btnContainer = document.querySelector('.preview-buttons');
     const scrollableDiv = document.querySelector('#pdfReportTable > div'); 
 
-    // Visual Feedback
     const originalText = shareBtn ? shareBtn.innerHTML : '';
     if(action === 'share' && shareBtn) {
         shareBtn.innerHTML = '⏳ બની રહ્યું છે...';
-        showToast("PDF બની રહ્યું છે... કૃપા કરીને રાહ જુઓ", "success");
+        showToast("PDF બની રહ્યું છે...", "success");
     } else {
         showToast("PDF ડાઉનલોડ થઈ રહ્યું છે...", "success");
     }
 
-    const originalStyles = {
-        overflow: element.style.overflow,
-        height: element.style.height,
-        width: element.style.width,
-        divOverflow: scrollableDiv ? scrollableDiv.style.overflow : ''
-    };
-
+    const originalStyles = { overflow: element.style.overflow, height: element.style.height, width: element.style.width, divOverflow: scrollableDiv ? scrollableDiv.style.overflow : '' };
     if(btnContainer) btnContainer.style.display = 'none';
 
-    // Force Wide (2500px)
     const table = document.querySelector('.wide-table');
     const requiredWidth = table ? Math.max(table.scrollWidth + 250, 2500) : 2500;
 
-    element.style.overflow = 'visible';
-    element.style.height = 'auto';
-    element.style.width = requiredWidth + 'px';
-    element.style.background = 'white';
-    
-    if(scrollableDiv) {
-        scrollableDiv.style.overflow = 'visible';
-        scrollableDiv.style.maxHeight = 'none';
-    }
+    element.style.overflow = 'visible'; element.style.height = 'auto'; element.style.width = requiredWidth + 'px'; element.style.background = 'white';
+    if(scrollableDiv) { scrollableDiv.style.overflow = 'visible'; scrollableDiv.style.maxHeight = 'none'; }
 
     try {
-        const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            width: requiredWidth,
-            windowWidth: requiredWidth,
-            scrollY: -window.scrollY 
-        });
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true, width: requiredWidth, windowWidth: requiredWidth, scrollY: -window.scrollY });
 
-        // Restore styles immediately
-        element.style.overflow = originalStyles.overflow;
-        element.style.height = originalStyles.height;
-        element.style.width = originalStyles.width;
+        element.style.overflow = originalStyles.overflow; element.style.height = originalStyles.height; element.style.width = originalStyles.width;
         if(scrollableDiv) scrollableDiv.style.overflow = originalStyles.divOverflow;
         if(btnContainer) btnContainer.style.display = 'flex';
 
@@ -444,14 +463,12 @@ async function handlePDFAction(action) {
 
         if (action === 'share') {
             const pdfBlob = pdf.output('blob');
-            // Create File Object HERE to be ready
-            globalFileForShare = new File([pdfBlob], fileName, { type: "application/pdf" });
+            generatedFileForShare = new File([pdfBlob], fileName, { type: "application/pdf" });
             
-            // UPDATE BUTTON FOR STEP 2
             if(shareBtn) {
                 shareBtn.innerHTML = '📤 હવે મોકલો (ક્લિક કરો)';
                 shareBtn.style.background = '#e91e63'; 
-                showToast("PDF તૈયાર છે! હવે 'મોકલો' બટન દબાવો.", "success");
+                showToast("તૈયાર છે! હવે 'મોકલો' દબાવો.", "success");
             }
         } else {
             pdf.save(fileName);
@@ -459,12 +476,9 @@ async function handlePDFAction(action) {
         }
 
     } catch (err) {
-        element.style.overflow = originalStyles.overflow;
-        element.style.height = originalStyles.height;
-        element.style.width = originalStyles.width;
+        element.style.overflow = originalStyles.overflow; element.style.height = originalStyles.height; element.style.width = originalStyles.width;
         if(scrollableDiv) scrollableDiv.style.overflow = originalStyles.divOverflow;
         if(btnContainer) btnContainer.style.display = 'flex';
-        
         if(action === 'share' && shareBtn) shareBtn.innerHTML = originalText;
         console.error(err);
         alert("Error: " + err.message);
