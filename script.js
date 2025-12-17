@@ -216,9 +216,34 @@ function saveStockData() {
     });
     localStorage.setItem(`stock_${document.getElementById('stockYearSelector').value}_${document.getElementById('stockMonthSelector').value}`, JSON.stringify(appState.stock));
 }
-function loadMatruMandalStockData() { /* Similar to stock */ } 
-function saveMatruMandalStockData() { /* Similar to stock */ }
-function updateMatruMandalStockTotals() { /* Similar */ }
+function loadMatruMandalStockData() { 
+    const m = document.getElementById('matruMandalStockMonthSelector').value;
+    const y = document.getElementById('matruMandalStockYearSelector').value;
+    appState.matruMandalStock = JSON.parse(localStorage.getItem(`matruMandalStock_${y}_${m}`)) || {};
+    ['singdana','tal','gol'].forEach(i => {
+        if(document.getElementById(`${i}_open`)) document.getElementById(`${i}_open`).value = appState.matruMandalStock[`${i}_open`] || '';
+        if(document.getElementById(`${i}_income`)) document.getElementById(`${i}_income`).value = appState.matruMandalStock[`${i}_income`] || '';
+    });
+    updateMatruMandalStockTotals();
+} 
+function saveMatruMandalStockData() { 
+    ['singdana','tal','gol'].forEach(i => {
+        appState.matruMandalStock[`${i}_open`] = document.getElementById(`${i}_open`).value;
+        appState.matruMandalStock[`${i}_income`] = document.getElementById(`${i}_income`).value;
+    });
+    const m = document.getElementById('matruMandalStockMonthSelector').value;
+    const y = document.getElementById('matruMandalStockYearSelector').value;
+    localStorage.setItem(`matruMandalStock_${y}_${m}`, JSON.stringify(appState.matruMandalStock));
+}
+function updateMatruMandalStockTotals() { 
+    let html = '';
+    ['singdana','tal','gol'].forEach(i => {
+        const o = parseFloat(document.getElementById(`${i}_open`)?.value)||0;
+        const inc = parseFloat(document.getElementById(`${i}_income`)?.value)||0;
+        html += `<div style="display:flex; justify-content:space-between;"><span>${i}:</span><b>${(o+inc).toFixed(3)}</b></div>`;
+    });
+    document.getElementById('matruMandalStockTotals').innerHTML = html;
+}
 
 // 4. REPORT
 function generateReport(isDaily) {
@@ -305,7 +330,7 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** NEW ROBUST PDF FUNCTION (DIRECT MODIFICATION) ***
+// *** ERROR FIXED: CALCULATE HEIGHT FROM CANVAS, NOT PDF OBJECT ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
@@ -344,7 +369,7 @@ async function handlePDFAction(action) {
             scale: 2,
             useCORS: true,
             windowWidth: 1000, 
-            scrollY: -window.scrollY // Fix for scroll position issues
+            scrollY: -window.scrollY 
         });
 
         // 5. Restore Styles IMMEDIATELY
@@ -354,12 +379,13 @@ async function handlePDFAction(action) {
         if(scrollableDiv) scrollableDiv.style.overflow = originalStyles.divOverflow;
         if(btnContainer) btnContainer.style.display = 'flex';
 
-        // 6. Generate PDF
+        // 6. Generate PDF (FIXED LOGIC)
         const imgData = canvas.toDataURL('image/png');
         const { jsPDF } = window.jspdf;
-        const pdfW = 210; // A4 Width
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfH = (imgProps.height * pdfW) / imgProps.width;
+        const pdfW = 210; // A4 Width in mm
+        
+        // --- FIX IS HERE: Use canvas math instead of pdf object ---
+        const pdfH = (canvas.height * pdfW) / canvas.width;
 
         const pdf = new jsPDF('p', 'mm', [pdfW, pdfH + 10]);
         pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
@@ -399,7 +425,7 @@ async function handlePDFAction(action) {
 }
 
 // 7. BILL & UTILS (Existing functions)
-function calculateMasalaAmounts() { /* ...Same as before... */
+function calculateMasalaAmounts() { 
     const m = document.getElementById('billMonthSelector').value || appState.currentMonth;
     const y = document.getElementById('billYearSelector').value || appState.currentYear;
     const benData = JSON.parse(localStorage.getItem(`beneficiaries_${y}_${m}`)) || {};
@@ -432,9 +458,28 @@ function fillCert(s, r) {
 }
 function closeCertificate(id) { document.getElementById(id).style.display = 'none'; }
 function showToast(m,t) { const x=document.getElementById('toast'); x.textContent=m; x.className=`toast show ${t}`; setTimeout(()=>x.classList.remove('show'),3000); }
-function loadCenterInfo() { /* Same */ }
-function saveCenterInfo() { /* Same */ appState.centerInfo.centerName = document.getElementById('centerNameHome').value; appState.centerInfo.workerName = document.getElementById('workerNameHome').value; appState.centerInfo.sejo = document.getElementById('sejoHome').value; appState.centerInfo.centerCode = document.getElementById('centerCodeHome').value; localStorage.setItem('centerInfo', JSON.stringify(appState.centerInfo)); showToast("સેવ થયું","success"); }
-function calculateAge() { /* Same */ }
+function loadCenterInfo() { 
+    const info = JSON.parse(localStorage.getItem('centerInfo'));
+    if(info) {
+        appState.centerInfo = info;
+        if(document.getElementById('centerNameHome')) document.getElementById('centerNameHome').value = info.centerName;
+        if(document.getElementById('workerNameHome')) document.getElementById('workerNameHome').value = info.workerName;
+        if(document.getElementById('sejoHome')) document.getElementById('sejoHome').value = info.sejo;
+        if(document.getElementById('centerCodeHome')) document.getElementById('centerCodeHome').value = info.centerCode;
+    }
+}
+function saveCenterInfo() { appState.centerInfo.centerName = document.getElementById('centerNameHome').value; appState.centerInfo.workerName = document.getElementById('workerNameHome').value; appState.centerInfo.sejo = document.getElementById('sejoHome').value; appState.centerInfo.centerCode = document.getElementById('centerCodeHome').value; localStorage.setItem('centerInfo', JSON.stringify(appState.centerInfo)); showToast("સેવ થયું","success"); }
+function calculateAge() { 
+    const birthDate = new Date(document.getElementById('birthDate').value);
+    const currentDate = new Date(document.getElementById('currentDate').value);
+    if (isNaN(birthDate)) { showToast("જન્મ તારીખ નાખો", "error"); return; }
+    let years = currentDate.getFullYear() - birthDate.getFullYear();
+    let months = currentDate.getMonth() - birthDate.getMonth();
+    let days = currentDate.getDate() - birthDate.getDate();
+    if (days < 0) { months--; days += new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate(); }
+    if (months < 0) { years--; months += 12; }
+    document.getElementById('ageResult').innerText = `${years} વર્ષ, ${months} મહિના, ${days} દિવસ`;
+}
 function appendToDisplay(v) { document.getElementById('calcDisplay').innerText += v; }
 function clearCalculator() { document.getElementById('calcDisplay').innerText = '0'; }
 function deleteLast() { let d=document.getElementById('calcDisplay'); d.innerText=d.innerText.slice(0,-1)||'0'; }
