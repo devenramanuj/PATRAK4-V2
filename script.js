@@ -2,8 +2,8 @@
 // 1. AUTH & INIT
 // ==========================================
 const CORRECT_PASSWORD = "Dev123";
-// ગ્લોબલ વેરિયેબલ શેરિંગ માટે (મહત્વનું)
-let generatedFileForShare = null;
+// ગ્લોબલ વેરિયેબલ શેરિંગ માટે (Blob સાચવીશું)
+let generatedBlobForShare = null;
 
 const appState = {
     currentMonth: new Date().getMonth(),
@@ -307,7 +307,7 @@ function generateReport(isDaily) {
 
 function openPreview() {
     // RESET GLOBAL SHARE VAR (દર વખતે નવેસરથી શરૂ કરવા)
-    generatedFileForShare = null;
+    generatedBlobForShare = null;
     
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
@@ -333,39 +333,41 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** FINAL FIX: 2-STEP SHARING WITH ERROR ALERT & FALLBACK ***
+// *** FINAL FIX: 2-STEP SHARING WITHOUT TEXT ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
     const shareBtn = document.getElementById('btnShare');
 
     // === STEP 2: SHARE IF READY ===
-    if(action === 'share' && generatedFileForShare) {
+    if(action === 'share' && generatedBlobForShare) {
         try {
+            // FIX: Create file fresh here, and NO TEXT/TITLE
+            const file = new File([generatedBlobForShare], "Anganwadi_Report.pdf", { type: "application/pdf" });
+            
             await navigator.share({
-                files: [generatedFileForShare],
-                title: 'આંગણવાડી રિપોર્ટ',
-                text: 'જુઓ આંગણવાડી પત્રક રિપોર્ટ PDF'
+                files: [file]
+                // title અને text કાઢી નાખ્યા છે જેથી error ન આવે
             });
+            
             // Success reset
-            generatedFileForShare = null;
+            generatedBlobForShare = null;
             if(shareBtn) {
                 shareBtn.innerHTML = '📱 WhatsApp';
                 shareBtn.style.background = '#25D366';
             }
         } catch(e) {
             // ERROR ALERT + FALLBACK
-            alert("WhatsApp શેરિંગ નિષ્ફળ ગયું છે (Error: " + e.message + ").\n\nચિંતા કરશો નહીં, PDF ડાઉનલોડ થઈ રહી છે. તમે તેને ફાઈલ મેનેજર માંથી શેર કરી શકો છો.");
+            alert("WhatsApp શેરિંગ નિષ્ફળ ગયું છે. કદાચ તમારું બ્રાઉઝર સીધું શેરિંગ સપોર્ટ નથી કરતું.\n\nચિંતા કરશો નહીં, PDF ડાઉનલોડ થઈ રહી છે. તમે તેને ફાઈલ મેનેજર માંથી શેર કરી શકો છો.");
             
-            // Auto Download Fallback
-            const url = URL.createObjectURL(generatedFileForShare);
+            const url = URL.createObjectURL(generatedBlobForShare);
             const a = document.createElement('a');
             a.href = url;
             a.download = "Anganwadi_Report.pdf";
             a.click();
             URL.revokeObjectURL(url);
             
-            generatedFileForShare = null;
+            generatedBlobForShare = null;
             if(shareBtn) {
                 shareBtn.innerHTML = '📱 WhatsApp';
                 shareBtn.style.background = '#25D366';
@@ -397,6 +399,7 @@ async function handlePDFAction(action) {
 
     if(btnContainer) btnContainer.style.display = 'none';
 
+    // Force Wide
     const table = document.querySelector('.wide-table');
     const requiredWidth = table ? Math.max(table.scrollWidth + 250, 2500) : 2500;
 
@@ -437,10 +440,9 @@ async function handlePDFAction(action) {
 
         if (action === 'share') {
             const pdfBlob = pdf.output('blob');
-            const file = new File([pdfBlob], fileName, { type: "application/pdf" });
             
-            // SAVE FILE GLOBALLY
-            generatedFileForShare = file;
+            // SAVE BLOB GLOBALLY
+            generatedBlobForShare = pdfBlob;
             
             // UPDATE BUTTON FOR STEP 2
             if(shareBtn) {
