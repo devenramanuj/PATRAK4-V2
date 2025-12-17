@@ -327,7 +327,7 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** FINAL FIX: DYNAMIC WIDTH CALCULATION FOR WIDE TABLES ***
+// *** FINAL WIDTH FIX: 2500px Safety Buffer ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
@@ -346,13 +346,13 @@ async function handlePDFAction(action) {
 
     if(btnContainer) btnContainer.style.display = 'none';
 
-    // *** FIX: Get the REAL width of the table (could be 2000px+) ***
+    // *** SUPER WIDE WIDTH FORCE (2500px) ***
     const table = document.querySelector('.wide-table');
-    const requiredWidth = table ? Math.max(table.scrollWidth + 50, 1500) : 1500;
+    const requiredWidth = table ? Math.max(table.scrollWidth + 250, 2500) : 2500;
 
     element.style.overflow = 'visible';
     element.style.height = 'auto';
-    element.style.width = requiredWidth + 'px'; // Set to actual table width
+    element.style.width = requiredWidth + 'px';
     element.style.background = 'white';
     
     if(scrollableDiv) {
@@ -364,7 +364,8 @@ async function handlePDFAction(action) {
         const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
-            windowWidth: requiredWidth, // Capture full width
+            width: requiredWidth, // Force Width
+            windowWidth: requiredWidth,
             scrollY: -window.scrollY 
         });
 
@@ -377,8 +378,8 @@ async function handlePDFAction(action) {
         const imgData = canvas.toDataURL('image/png');
         const { jsPDF } = window.jspdf;
         
-        // Use Landscape ('l') for wide tables
-        const pdfW = 297; // A4 Landscape width in mm
+        // A4 Landscape
+        const pdfW = 297; 
         const pdfH = (canvas.height * pdfW) / canvas.width;
 
         const pdf = new jsPDF('l', 'mm', [pdfW, pdfH + 10]);
