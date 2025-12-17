@@ -2,8 +2,8 @@
 // 1. AUTH & INIT
 // ==========================================
 const CORRECT_PASSWORD = "Dev123";
-// ગ્લોબલ વેરિયેબલ શેરિંગ માટે (Blob સાચવીશું)
-let generatedBlobForShare = null;
+// ગ્લોબલ વેરિયેબલ (ફાઈલ સાચવવા માટે)
+let globalFileForShare = null;
 
 const appState = {
     currentMonth: new Date().getMonth(),
@@ -307,7 +307,7 @@ function generateReport(isDaily) {
 
 function openPreview() {
     // RESET GLOBAL SHARE VAR (દર વખતે નવેસરથી શરૂ કરવા)
-    generatedBlobForShare = null;
+    globalFileForShare = null;
     
     const reportHTML = document.getElementById('reportTableContainer').innerHTML;
     if(!reportHTML || reportHTML.includes("બટન દબાવો")) { showToast("પહેલા રિપોર્ટ જનરેટ કરો!", "error"); return; }
@@ -333,41 +333,45 @@ function openPreview() {
 
 function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// *** FINAL FIX: 2-STEP SHARING WITHOUT TEXT ***
+// *** FINAL FIX: 2-STEP SHARING WITH SMOOTH FALLBACK (NO ERROR MSG) ***
 async function handlePDFAction(action) {
     if(!window.jspdf || !window.html2canvas) { alert("Error: Libraries not loaded. Check Internet connection."); return; }
 
     const shareBtn = document.getElementById('btnShare');
 
     // === STEP 2: SHARE IF READY ===
-    if(action === 'share' && generatedBlobForShare) {
+    if(action === 'share' && globalFileForShare) {
         try {
-            // FIX: Create file fresh here, and NO TEXT/TITLE
-            const file = new File([generatedBlobForShare], "Anganwadi_Report.pdf", { type: "application/pdf" });
-            
-            await navigator.share({
-                files: [file]
-                // title અને text કાઢી નાખ્યા છે જેથી error ન આવે
-            });
-            
-            // Success reset
-            generatedBlobForShare = null;
-            if(shareBtn) {
-                shareBtn.innerHTML = '📱 WhatsApp';
-                shareBtn.style.background = '#25D366';
+            // Check if device supports sharing files
+            if(navigator.canShare && navigator.canShare({ files: [globalFileForShare] })) {
+                await navigator.share({
+                    files: [globalFileForShare]
+                    // removed title/text to avoid permission errors
+                });
+                
+                // If successful
+                globalFileForShare = null;
+                if(shareBtn) {
+                    shareBtn.innerHTML = '📱 WhatsApp';
+                    shareBtn.style.background = '#25D366';
+                }
+            } else {
+                // If canShare returns false, force error to trigger fallback
+                throw new Error("Device does not support file sharing");
             }
         } catch(e) {
-            // ERROR ALERT + FALLBACK
-            alert("WhatsApp શેરિંગ નિષ્ફળ ગયું છે. કદાચ તમારું બ્રાઉઝર સીધું શેરિંગ સપોર્ટ નથી કરતું.\n\nચિંતા કરશો નહીં, PDF ડાઉનલોડ થઈ રહી છે. તમે તેને ફાઈલ મેનેજર માંથી શેર કરી શકો છો.");
+            // SILENT FALLBACK: Don't show scary error
+            // Just inform user about download
+            alert("તમારા મોબાઈલમાં ડાયરેક્ટ શેરિંગ સપોર્ટ નથી, તેથી PDF ડાઉનલોડ થઈ રહી છે. તમે 'Downloads' ફોલ્ડર માંથી તેને મોકલી શકો છો.");
             
-            const url = URL.createObjectURL(generatedBlobForShare);
+            const url = URL.createObjectURL(globalFileForShare);
             const a = document.createElement('a');
             a.href = url;
             a.download = "Anganwadi_Report.pdf";
             a.click();
             URL.revokeObjectURL(url);
             
-            generatedBlobForShare = null;
+            globalFileForShare = null;
             if(shareBtn) {
                 shareBtn.innerHTML = '📱 WhatsApp';
                 shareBtn.style.background = '#25D366';
@@ -399,7 +403,7 @@ async function handlePDFAction(action) {
 
     if(btnContainer) btnContainer.style.display = 'none';
 
-    // Force Wide
+    // Force Wide (2500px)
     const table = document.querySelector('.wide-table');
     const requiredWidth = table ? Math.max(table.scrollWidth + 250, 2500) : 2500;
 
@@ -440,9 +444,8 @@ async function handlePDFAction(action) {
 
         if (action === 'share') {
             const pdfBlob = pdf.output('blob');
-            
-            // SAVE BLOB GLOBALLY
-            generatedBlobForShare = pdfBlob;
+            // Create File Object HERE to be ready
+            globalFileForShare = new File([pdfBlob], fileName, { type: "application/pdf" });
             
             // UPDATE BUTTON FOR STEP 2
             if(shareBtn) {
