@@ -1,7 +1,7 @@
 // ==========================================
 // 1. AUTH & INIT
 // ==========================================
-const CORRECT_PASSWORD = "Dev123";
+const CORRECT_PASSWORD = "new123";
 let globalFileForShare = null; // WhatsApp શેરિંગ માટે
 
 const appState = {
